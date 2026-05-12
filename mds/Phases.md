@@ -211,6 +211,9 @@ Current progress:
   local results.
 - Complete: setup, operations, troubleshooting, privacy/provider disclosure,
   and known-limitations documentation.
+- Complete: application-wide shared-password login with rate-limited bcrypt
+  verification, a 12-hour HTTP-only session, protected non-auth API routes,
+  session restoration/logout, and single-verification document uploads.
 - Pending release sign-off: connected daily-use verification and acceptance of
   the documented limitations.
 

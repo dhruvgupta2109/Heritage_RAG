@@ -10,7 +10,8 @@ These rules turn the PRD into mandatory engineering and product constraints. If 
 
 - Build for one user on localhost in v1.
 - Bind frontend/backend services to loopback unless the user explicitly opts into another network configuration.
-- Keep upload protection separate from a full account/login system.
+- Protect the complete local app with one server-validated shared password
+  session. Do not misrepresent it as user identity or multi-tenant authorization.
 - Avoid adding cloud deployment, collaboration, fine-tuning, or unrelated administration features to v1.
 
 ## 2. Grounding and Answer Rules
@@ -75,7 +76,10 @@ These rules turn the PRD into mandatory engineering and product constraints. If 
 
 - Never expose provider keys or password hashes to the frontend.
 - Keep secrets in ignored environment files; commit only an `.env.example`.
-- Hash upload passwords with Argon2id or bcrypt; do not use reversible encryption or a fast general-purpose hash.
+- Hash the shared application/upload password with Argon2id or bcrypt; do not
+  use reversible encryption or a fast general-purpose hash.
+- Keep the application session HTTP-only, time-limited, rate-limited at login,
+  and required by every non-authentication API route.
 - Rate-limit unlock attempts and issue only a short-lived upload session.
 - Validate MIME/content, extension, size, and file name; block path traversal and executable uploads.
 - Treat document contents as untrusted prompt input. Delimit evidence and prevent it from changing system or security instructions.

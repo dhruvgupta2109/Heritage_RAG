@@ -30,7 +30,9 @@ Gemini keys are optional; their model choices remain visible but unavailable
 until the key authenticates and grants access to the configured model.
 
 Open `http://127.0.0.1:3000`. The API uses `http://127.0.0.1:8000`. Both bind to
-loopback by default.
+loopback by default. Enter the shared application password `Password` to open
+the workspace. The server issues a 12-hour HTTP-only session by default; change
+`APP_SESSION_TTL_SECONDS` in `.env` if a different duration is required.
 
 ## 2. Release Verification
 
@@ -127,11 +129,12 @@ be sensitive.
 
 | Symptom | Check |
 |---|---|
+| The login screen returns | The shared session expired or the API restarted; enter `Password` again. In-memory sessions intentionally do not survive backend restarts. |
 | Model is disabled | Refresh provider health; confirm the key is valid and the configured model is allowed for that key. |
 | API offline | Confirm port 8000 is free and `uv sync --project apps/api` completed. |
 | Documents show zero chunks | Run `npm run index`; inspect parsing failures in the command output and structured log. |
 | An uploaded file is rejected | Confirm PDF/DOCX/TXT/MD, valid file content, and size under 25 MB. |
-| Upload password stops working | Wait for the rate-limit window after repeated failures; the default is `Password` unless its bcrypt hash was changed. |
+| The shared password stops working | Wait for the rate-limit window after repeated failures; the default is `Password` unless `UPLOAD_PASSWORD_HASH` was changed. |
 | Citation opens the wrong place | Re-index the source and confirm the PDF reader-facing page matches extracted page order. |
 | A non-PDF has no page | This is expected when native pagination is unavailable; use the structural locator. |
 | An answer has Very low confidence | The final answer had no valid supporting citation; refine the question or add the missing document. |

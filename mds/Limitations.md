@@ -21,8 +21,8 @@
 - Cloud LLM providers receive the current question and retrieved passages.
 - OpenAI and Gemini adapters are implemented, but live access remains dependent
   on a valid key and permission for the configured model IDs.
-- The shared upload password is only an upload gate. There is no authentication,
-  authorization, or per-user/private history.
+- The shared password gates the complete app but does not provide named user
+  identity, permissions, or per-user/private history.
 - All browsers connected to the same backend share the same chat history and
   knowledge base.
 - Manual folder re-indexing is supported; automatic filesystem watching is not.

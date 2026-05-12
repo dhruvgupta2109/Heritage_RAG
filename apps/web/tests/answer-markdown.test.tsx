@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   AnswerMarkdown,
+  LoginScreen,
   groupChatsByDate,
   type ChatSummary,
   type Source,
@@ -208,6 +209,60 @@ test("chat history is grouped by pinned and calendar date", () => {
       ["previous-month"],
     ],
   );
+});
+
+test("chat history fills the available sidebar height", () => {
+  const css = readFileSync(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+  const historyList = css.match(
+    /\.history-list\s*\{([\s\S]*?)\n\}/,
+  )?.[1];
+
+  assert.ok(historyList);
+  assert.match(historyList, /min-height:\s*0/);
+  assert.match(historyList, /flex:\s*1/);
+  assert.match(historyList, /max-height:\s*none/);
+  assert.doesNotMatch(historyList, /42vh|360px|padding:[^;]*110px/);
+});
+
+test("the complete app is gated by the shared password session", () => {
+  const html = renderToStaticMarkup(
+    <LoginScreen
+      checking={false}
+      theme="light"
+      onToggleTheme={() => undefined}
+      onAuthenticated={async () => undefined}
+    />,
+  );
+  const page = readFileSync(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const css = readFileSync(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(html, /Heritage — Staff Access/);
+  assert.match(
+    html,
+    /This portal is restricted to authorized staff\. Enter the access password to continue\./,
+  );
+  assert.match(html, /type="password"/);
+  assert.match(html, /autoComplete="current-password"/);
+  assert.match(html, />Continue</);
+  assert.match(page, /api\/auth\/session/);
+  assert.match(page, /credentials: "include"/);
+  assert.match(page, /authStatus !== "authenticated"/);
+  assert.match(
+    page,
+    /async function completeAuthentication\(\)[\s\S]*?startNewChat\(\);[\s\S]*?loadChats\(\)/,
+  );
+  assert.doesNotMatch(page, /loadChats\(true\)/);
+  assert.ok(css.includes(".login-card"));
+  assert.ok(css.includes(".login-password-field"));
 });
 
 test("document uploads expose real per-file progress, indexing, and retry states", () => {

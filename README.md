@@ -36,9 +36,9 @@ Prerequisites: Node.js 20.9 or newer, Python 3.11, and `uv`.
 2. If `.env` does not exist, copy `.env.example` to `.env`.
 3. Set `GROQ_API_KEY` in `.env`. Optionally set `OPENAI_API_KEY` and
    `GEMINI_API_KEY`; models stay visible but disabled until their provider
-   authenticates. The local document-upload password defaults to `Password`;
-   override `UPLOAD_PASSWORD_HASH` with a bcrypt hash before using the app in a
-   less trusted environment. Never commit `.env`.
+   authenticates. The complete app is protected by the shared local password
+   `Password`; override `UPLOAD_PASSWORD_HASH` with a bcrypt hash before using
+   the app in a less trusted environment. Never commit `.env`.
 4. Install dependencies:
 
    ```bash
@@ -97,6 +97,9 @@ Implemented:
 - Password-gated multi-document upload with a short-lived HTTP-only session,
   rate limiting, safe file validation, duplicate detection, and immediate
   indexing.
+- A minimalist application-wide password login with a 12-hour HTTP-only
+  session. The same verified session unlocks document uploads, so the password
+  is entered only once.
 - Real per-file upload progress, processing/indexing status, independent
   indexed/duplicate/failure results, and one-click retry.
 - Manual folder re-indexing for documents copied directly into `DOCS/`.

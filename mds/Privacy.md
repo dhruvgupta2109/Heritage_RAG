@@ -13,7 +13,8 @@
 - Embedding generation through Chroma's local ONNX
   `all-MiniLM-L6-v2` model.
 - Structured redacted logs in `data/logs/`.
-- The upload password hash and provider keys in the ignored local `.env`.
+- The shared application password hash and provider keys in the ignored local
+  `.env`.
 
 No hosted vector database or embedding API is used.
 
@@ -41,9 +42,9 @@ The application has one installation-wide history. Any browser that can reach
 the same local backend can view, rename, pin, delete, and continue all chats.
 There are no user accounts or private per-browser conversations in v1.
 
-The upload password protects document addition only. It is not a login and does
-not protect chat history or source preview from another process or user that can
-reach the local API.
+The shared password protects the complete app and API through a 12-hour
+HTTP-only session. It still does not establish identity: everyone who knows the
+password sees the same chats, documents, and source previews.
 
 ## Logs and Backups
 

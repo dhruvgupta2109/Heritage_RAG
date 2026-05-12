@@ -17,6 +17,7 @@ import {
   Library,
   LoaderCircle,
   LockKeyhole,
+  LogOut,
   Menu,
   MoreHorizontal,
   Moon,
@@ -146,6 +147,7 @@ type ApiHealth = {
   }>;
   retrieval_modes: RetrievalOption[];
   documents: number;
+  pages: number;
   chunks: number;
   api_key_configured: boolean;
 };
@@ -207,6 +209,7 @@ type IndexResult = {
 
 type UploadStep = "checking" | "locked" | "ready" | "uploading";
 type Theme = "light" | "dark";
+type AuthStatus = "checking" | "authenticated" | "unauthenticated";
 
 type UploadItemStatus =
   | "ready"
@@ -951,7 +954,131 @@ function AssistantMessage({
   );
 }
 
+export function LoginScreen({
+  checking,
+  theme,
+  onToggleTheme,
+  onAuthenticated,
+}: {
+  checking: boolean;
+  theme: Theme;
+  onToggleTheme: () => void;
+  onAuthenticated: () => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const passwordId = useId();
+
+  async function submitLogin(event: FormEvent) {
+    event.preventDefault();
+    if (!password || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!response.ok) {
+        throw new Error(
+          await responseError(response, "The password is incorrect."),
+        );
+      }
+      setPassword("");
+      await onAuthenticated();
+    } catch (loginError) {
+      setError(
+        loginError instanceof Error
+          ? loginError.message
+          : "Could not verify the password.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="login-shell">
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+      <div className="ambient ambient-three" />
+      <button
+        className="theme-toggle login-theme-toggle"
+        type="button"
+        onClick={onToggleTheme}
+        aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+        aria-pressed={theme === "dark"}
+        title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+      >
+        {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+      </button>
+
+      <section className="login-card glass-strong" aria-busy={checking}>
+        <div className="login-brand">
+          <span className="login-brand-mark" aria-hidden="true">
+            <img src="/heritage-logo.png" alt="" />
+          </span>
+          <span>HERITAGE</span>
+        </div>
+        <h1>Heritage — Staff Access</h1>
+        <p className="login-copy">
+          This portal is restricted to authorized staff. Enter the access
+          password to continue.
+        </p>
+
+        {checking ? (
+          <div className="login-checking" role="status">
+            <LoaderCircle className="spin" size={18} />
+            Verifying your session
+          </div>
+        ) : (
+          <form className="login-form" onSubmit={submitLogin}>
+            <label htmlFor={passwordId}>Password</label>
+            <div className="login-password-field">
+              <LockKeyhole size={17} aria-hidden="true" />
+              <input
+                id={passwordId}
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                autoFocus
+                placeholder="Enter password"
+              />
+            </div>
+            {error && (
+              <p className="login-error" role="alert">
+                <AlertCircle size={14} />
+                {error}
+              </p>
+            )}
+            <button
+              className="login-submit"
+              type="submit"
+              disabled={!password || submitting}
+            >
+              {submitting ? (
+                <LoaderCircle className="spin" size={17} />
+              ) : (
+                <ShieldCheck size={17} />
+              )}
+              {submitting ? "Verifying…" : "Continue"}
+            </button>
+          </form>
+        )}
+        <p className="login-note">
+          One password protects the complete local knowledge workspace.
+        </p>
+      </section>
+    </main>
+  );
+}
+
 export default function Home() {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
@@ -989,9 +1116,24 @@ export default function Home() {
   const [retrievalMode, setRetrievalMode] =
     useState<RetrievalMode>("medium");
 
+  async function apiFetch(
+    input: RequestInfo | URL,
+    init: RequestInit = {},
+  ) {
+    const response = await fetch(input, {
+      ...init,
+      credentials: "include",
+    });
+    if (response.status === 401) {
+      setAuthStatus("unauthenticated");
+      setUploadOpen(false);
+    }
+    return response;
+  }
+
   async function loadHealth() {
     try {
-      const response = await fetch(`${API_URL}/api/health`);
+      const response = await apiFetch(`${API_URL}/api/health`);
       if (!response.ok) throw new Error("API unavailable");
       const data: ApiHealth = await response.json();
       setHealth(data);
@@ -1013,7 +1155,7 @@ export default function Home() {
     setEditingMessageId(null);
     setMobileSidebar(false);
     try {
-      const response = await fetch(`${API_URL}/api/chats/${chat.id}`);
+      const response = await apiFetch(`${API_URL}/api/chats/${chat.id}`);
       if (!response.ok) throw new Error("Conversation unavailable");
       const detail: ChatDetail = await response.json();
       setMessages(
@@ -1042,7 +1184,7 @@ export default function Home() {
 
   async function loadChats(restoreLatest = false) {
     try {
-      const response = await fetch(`${API_URL}/api/chats`);
+      const response = await apiFetch(`${API_URL}/api/chats`);
       if (!response.ok) throw new Error("Chat history unavailable");
       const data: ChatSummary[] = await response.json();
       setChats(data);
@@ -1055,8 +1197,30 @@ export default function Home() {
   }
 
   useEffect(() => {
-    void loadHealth();
-    void loadChats(true);
+    let active = true;
+    async function restoreSession() {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/session`, {
+          credentials: "include",
+        });
+        const session: { authenticated: boolean } = response.ok
+          ? await response.json()
+          : { authenticated: false };
+        if (!active) return;
+        if (session.authenticated) {
+          setAuthStatus("authenticated");
+          await Promise.all([loadHealth(), loadChats()]);
+        } else {
+          setAuthStatus("unauthenticated");
+        }
+      } catch {
+        if (active) setAuthStatus("unauthenticated");
+      }
+    }
+    void restoreSession();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -1176,12 +1340,38 @@ export default function Home() {
     setTheme(next);
   }
 
+  async function completeAuthentication() {
+    setAuthStatus("authenticated");
+    startNewChat();
+    await Promise.all([loadHealth(), loadChats()]);
+  }
+
+  async function logout() {
+    if (isSending) return;
+    try {
+      const response = await fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) return;
+      setAuthStatus("unauthenticated");
+      setHealth(null);
+      setChats([]);
+      setMessages([]);
+      setActiveChatId(null);
+      setActiveChatTitle("New conversation");
+      setInput("");
+    } catch {
+      // Keep the current authenticated view when the API cannot clear the cookie.
+    }
+  }
+
   async function pinChat(chat: ChatSummary) {
     if (chatActionBusy) return;
     setChatActionBusy(true);
     setChatActionError(null);
     try {
-      const response = await fetch(`${API_URL}/api/chats/${chat.id}`, {
+      const response = await apiFetch(`${API_URL}/api/chats/${chat.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pinned: !chat.pinned }),
@@ -1217,7 +1407,7 @@ export default function Home() {
     setChatActionBusy(true);
     setChatActionError(null);
     try {
-      const response = await fetch(`${API_URL}/api/chats/${renameChat.id}`, {
+      const response = await apiFetch(`${API_URL}/api/chats/${renameChat.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
@@ -1247,7 +1437,7 @@ export default function Home() {
     setChatActionBusy(true);
     setChatActionError(null);
     try {
-      const response = await fetch(`${API_URL}/api/chats/${deleteChat.id}`, {
+      const response = await apiFetch(`${API_URL}/api/chats/${deleteChat.id}`, {
         method: "DELETE",
       });
       if (!response.ok) {
@@ -1272,9 +1462,7 @@ export default function Home() {
     setUploadFeedback(null);
     setUploadFiles([]);
     try {
-      const response = await fetch(`${API_URL}/api/uploads/session`, {
-        credentials: "include",
-      });
+      const response = await apiFetch(`${API_URL}/api/uploads/session`);
       if (!response.ok) throw new Error("Could not check upload access.");
       const session: { unlocked: boolean } = await response.json();
       setUploadStep(session.unlocked ? "ready" : "locked");
@@ -1296,9 +1484,8 @@ export default function Home() {
     if (!uploadPassword || uploadStep === "checking") return;
     setUploadError(null);
     try {
-      const response = await fetch(`${API_URL}/api/uploads/unlock`, {
+      const response = await apiFetch(`${API_URL}/api/uploads/unlock`, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: uploadPassword }),
       });
@@ -1510,7 +1697,7 @@ export default function Home() {
     setIndexing(true);
     setIndexResult(null);
     try {
-      const response = await fetch(`${API_URL}/api/documents/reindex`, {
+      const response = await apiFetch(`${API_URL}/api/documents/reindex`, {
         method: "POST",
       });
       if (!response.ok) throw new Error("Indexing failed");
@@ -1560,7 +1747,7 @@ export default function Home() {
     answerAbortRef.current = controller;
 
     try {
-      const response = await fetch(`${API_URL}/api/chat/stream`, {
+      const response = await apiFetch(`${API_URL}/api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -1724,10 +1911,22 @@ export default function Home() {
     retrievalOptions.find((mode) => mode.id === retrievalMode) ??
     retrievalOptions[1];
 
+  if (authStatus !== "authenticated") {
+    return (
+      <LoginScreen
+        checking={authStatus === "checking"}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onAuthenticated={completeAuthentication}
+      />
+    );
+  }
+
   return (
     <main className="app-shell">
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
+      <div className="ambient ambient-three" />
 
       <aside
         className={`sidebar glass ${sidebarOpen ? "" : "is-collapsed"} ${
@@ -1891,10 +2090,10 @@ export default function Home() {
           </div>
           {sidebarOpen && (
             <div>
-              <strong>Your knowledge</strong>
+              <strong>Knowledge Database</strong>
               <span>
                 {health
-                  ? `${health.documents} document${health.documents === 1 ? "" : "s"} · ${health.chunks} chunks`
+                  ? `${health.documents} document${health.documents === 1 ? "" : "s"} · ${health.pages} page${health.pages === 1 ? "" : "s"}`
                   : "API offline"}
               </span>
             </div>
@@ -1963,6 +2162,16 @@ export default function Home() {
             >
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
             </button>
+            <button
+              className="theme-toggle"
+              type="button"
+              onClick={() => void logout()}
+              disabled={isSending}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut size={16} />
+            </button>
             <div className="privacy-chip">
               <span className={`status-dot ${health ? "online" : ""}`} />
               {health ? "Local index ready" : "API offline"}
@@ -1978,7 +2187,7 @@ export default function Home() {
             </div>
           ) : empty ? (
             <div className="welcome">
-              <h1>Ask what your documents know.</h1>
+              <h1>Answers from Heritage&apos;s curriculum documents</h1>
               <p className="welcome-copy">
                 Heritage answers from your local library, shows the exact page,
                 and tells you how strongly the evidence supports each response.

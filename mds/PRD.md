@@ -20,11 +20,12 @@ A locally-hosted chat application that lets you ask questions over a folder of y
 - Let you add new documents to the index through the UI, gated by a password.
 - Persist and let you revisit past chats, like ChatGPT/Claude history.
 - Clean, minimal, "glass" aesthetic — translucent panels, soft blur, no clutter.
-- Run entirely on localhost for now (no auth system, no multi-user, no cloud deploy).
+- Run entirely on localhost for now with one shared password session, no
+  multi-user identity system, and no cloud deploy.
 
 ## 3. Non-Goals (v1)
 
-- Multi-user accounts / login system (single password gate for uploads only).
+- Multi-user accounts, identity providers, permissions, or per-user data.
 - Cloud deployment or public hosting.
 - Fine-tuning or training custom models.
 - Real-time collaborative chat.
@@ -32,6 +33,8 @@ A locally-hosted chat application that lets you ask questions over a folder of y
 
 ## 4. User Stories
 
+- As the user, I enter the shared Heritage password and land in the complete
+  document workspace.
 - As the user, I open localhost, see a clean chat screen, and ask a question about my docs.
 - As the user, I use Groq by default and can choose any other configured,
   authenticated provider from the same model selector.
@@ -43,6 +46,16 @@ A locally-hosted chat application that lets you ask questions over a folder of y
 - As the user, I see how well the answer is supported by my documents, including a clear warning when the information is absent or weakly supported.
 
 ## 5. Functional Requirements
+
+### 5.0 Application Access
+- The complete interface and all non-authentication API routes require the
+  shared local password.
+- The initial password is `Password`; only its bcrypt hash is stored.
+- A successful login issues a 12-hour HTTP-only local session.
+- The same session authorizes document uploads, so a signed-in user is not
+  prompted for the password a second time.
+- Failed attempts are rate limited and error messages do not reveal
+  password details.
 
 ### 5.1 Chat Interface
 - Central chat window, ChatGPT-style bubbles, streaming token-by-token responses.
@@ -84,7 +97,8 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
 - Clicking it prompts for a password before the upload panel appears.
 - The initial single-user localhost password is `Password`; only its bcrypt
   hash is stored server-side and it can be overridden through local configuration.
-- Password is checked against a locally stored hash (e.g. in `.env` or a small config file) — not a full auth system, just a gate.
+- Password is checked against the same locally stored bcrypt hash used by the
+  application login. This is a shared gate, not a user identity system.
 - Supports drag-and-drop or file picker; accepts PDF, DOCX, TXT, MD (CSV optional) — matches whatever folder-based ingestion supports.
 - On upload: each file shows real transfer progress, a processing/indexing state,
   and an independent indexed, duplicate, or failed outcome. Failed files can be
@@ -195,7 +209,9 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
 
 ## 7. Security (v1 scope)
 
-- Upload endpoint gated by a single shared password (hashed, stored locally) — appropriate for a single-user localhost tool, not intended as real multi-tenant auth.
+- Every non-authentication API route is gated by a shared, hashed local
+  password session. This is appropriate for a trusted single-user localhost
+  tool and is not real multi-tenant authentication.
 - API keys for LLM providers kept in a local `.env`, never exposed to the frontend.
 - No public network exposure — app binds to `localhost` only.
 

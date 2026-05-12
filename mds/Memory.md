@@ -9,12 +9,15 @@ This file is the concise handoff record for future work. Update it whenever a de
 **Implementation status:** Runnable local multi-provider RAG app with Groq
 generation, availability-aware OpenAI/Gemini adapters, local hybrid/full re-ranking, Deep
 query decomposition, citations, confidence, evaluation data, password-gated
-document uploads, persistent chat actions, and a connected glass chat UI.
+application access and document uploads, persistent chat actions, and a
+connected glass chat UI.
 Phase 5 includes persistent light/dark themes, accessible confidence
 interaction, an in-app source/page drawer, and stopped-stream preservation.
 Phase 6 now includes deterministic answer/confidence evaluation,
 malicious-document defenses, structured redacted logs, recovery tooling, and a
 recorded 300-document local performance benchmark.
+The complete workspace and its non-auth API routes now sit behind the shared
+`Password` login with a 12-hour HTTP-only session.
 
 ## Current Product Definition
 
@@ -28,6 +31,7 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Password-gated uploads with per-file progress/retry and manual folder re-indexing.
 - Universal local chat history with date grouping, rename, pin/unpin, and confirmed deletion.
 - A minimalist glass UI with light/dark themes and WCAG 2.2 AA behavior.
+- A minimalist shared-password entry screen that opens the complete workspace.
 
 ## Confirmed Decisions
 
@@ -50,8 +54,9 @@ Heritage RAG is a single-user, localhost document assistant with:
   connected to the same FastAPI/SQLite backend sees the same chat history.
   Per-user/private history requires accounts and is outside v1.
 - Manual folder re-indexing is the initial default.
-- Document upload uses the shared local password `Password`, stored as a bcrypt
-  hash, with a 10-minute HTTP-only session and five-attempt rate limit.
+- The complete application uses the shared local password `Password`, stored as
+  a bcrypt hash, with a rate-limited 12-hour HTTP-only session. The same
+  authenticated session authorizes document uploads without a second prompt.
 - Uploaded files are limited to 25 MB each and PDF, DOCX, TXT, or MD.
 - OCR is not required for the current corpus.
 - Partial evidence is capped at Medium confidence and acknowledged conflicting
@@ -129,7 +134,14 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Recorded the quality baseline: Quick 18/21, Medium 21/21, Deep 21/21 expected
   document/page hits; deterministic labeled answer metrics are all 100%.
 - Added operations, privacy/provider disclosure, and known-limitations guides.
-- Expanded backend coverage from 34 to 42 passing tests.
+- Added the minimalist application login, protected every non-auth API route,
+  restored authenticated sessions on reload, and added explicit logout.
+- Authenticated entry now opens a fresh **New conversation** while retaining
+  the shared history in the sidebar.
+- Reused the application session for document uploads while preserving the
+  legacy short-lived upload unlock as a compatibility fallback.
+- Expanded backend coverage from 34 to 43 passing tests and web coverage to 15
+  focused tests.
 
 ## Documentation Completed
 
@@ -174,6 +186,10 @@ These decisions should be captured in the PRD, Architecture, and this file when 
 
 ### 2026-07-30
 
+- Added an application-wide shared-password gate with a 12-hour HTTP-only
+  session, minimalist themed login screen, session restoration, and logout.
+- Reused the verified application session for uploads so users enter the
+  password only once.
 - Started Phase 6 release hardening with labeled answer evaluation, calibrated
   partial/conflict confidence behavior, prompt-injection defenses, structured
   redacted logs, backup/restore tooling, a 300-document performance benchmark,

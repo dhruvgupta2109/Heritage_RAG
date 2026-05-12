@@ -1,6 +1,6 @@
 # Heritage RAG — Product Design System
 
-**Status:** Phase 5 complete; unchanged by Phase 6 backend hardening
+**Status:** Phase 5 complete; Phase 6 application-access screen added
 
 **Applies to:** Web UI v1
 
@@ -30,6 +30,19 @@ Phase 5 completion record:
   presenting completed confidence.
 - Verified by the user: visual and keyboard behavior at 360 px, tablet, and
   desktop widths in the connected local application.
+
+Phase 6 application-access addition:
+
+- Before the workspace appears, show a centered minimalist glass login card
+  titled **Heritage — Staff Access**, with the authorized-staff notice, one
+  labeled password field, and a clear **Continue** action.
+- The login inherits the active light/dark theme and includes its own theme
+  toggle so the first screen remains visually consistent with the workspace.
+- Checking, submitting, and invalid-password states are explicit; authentication
+  errors remain generic.
+- A successful login opens a fresh **New conversation** while restoring chat
+  history in the sidebar. A compact top-bar logout action ends the shared
+  session.
 
 ## 2. Application Layout
 
@@ -211,15 +224,17 @@ Do not hide these warnings behind hover and do not render a confident-looking an
 ## 6. Upload Experience
 
 1. User chooses **Add documents**.
-2. A small unlock dialog requests the upload password.
-3. On success, a larger glass panel accepts drag-and-drop or file selection.
+2. The server verifies the existing application session; no second password is
+   requested during a normal signed-in session.
+3. A larger glass panel accepts drag-and-drop or file selection.
 4. Each file shows real transfer progress, then a processing/indexing state.
 5. Completion states list exactly what was indexed, already present as a
    duplicate, or failed.
 6. A failed row keeps its actionable error and offers **Retry** without
    restarting successful rows.
 
-Password errors are generic. Unsupported file type and size errors are specific and actionable.
+The legacy upload unlock remains as a compatibility fallback. Password errors
+are generic. Unsupported file type and size errors are specific and actionable.
 
 ## 7. Feedback and System States
 

@@ -24,12 +24,13 @@ The system has four durable responsibilities:
 ```text
 Browser
   └─ Next.js UI
+      ├─ Shared-password login and session restoration
       ├─ Chat and streaming answer renderer
       ├─ Model and speed selectors
       ├─ Source/page preview
       ├─ Confidence badge and five-state popover
       ├─ History sidebar
-      └─ Password-gated upload dialog
+      └─ Session-authorized upload dialog
              │ HTTP + SSE (or streaming fetch)
              ▼
       FastAPI application
@@ -46,7 +47,9 @@ Browser
           └─ External LLM/embedding APIs when configured
 ```
 
-Only the backend can read provider keys, compare the upload password hash, write documents, or access the vector store.
+Only the backend can read provider keys, compare the shared password hash,
+issue the HTTP-only application session, write documents, or access the vector
+store. All non-authentication API routes require that session.
 
 ## 3. Proposed Repository Layout
 
@@ -219,6 +222,9 @@ The UI must not treat a partial stream as a fully cited answer. A stopped or fai
 
 | Method | Route | Purpose |
 |---|---|---|
+| `POST` | `/api/auth/login` | Verify the shared password and issue the application session |
+| `GET` | `/api/auth/session` | Restore or reject the current application session |
+| `POST` | `/api/auth/logout` | Clear the application session |
 | `POST` | `/api/chat/stream` | Ask a question and stream the grounded answer |
 | `GET` | `/api/chats` | List chat history |
 | `GET` | `/api/chats/{id}` | Load messages and source/confidence snapshots |
@@ -254,11 +260,14 @@ send the existing `chat_id`; title generation is not repeated.
 ## 8. Security and Privacy
 
 - Bind services to loopback by default.
-- Keep API keys and the upload password hash server-side.
+- Keep API keys and the shared application password hash server-side.
+- Require a valid 12-hour HTTP-only session for every non-authentication API
+  route. Permit unauthenticated CORS preflight requests.
 - Use a password hashing algorithm intended for passwords, such as Argon2id or bcrypt.
 - Return a short-lived, HTTP-only upload-unlock cookie or token after password verification; rate-limit attempts.
 - The local default password is `Password`, represented only by a configurable
-  bcrypt hash. The upload session expires after 10 minutes.
+  bcrypt hash. The application session expires after 12 hours and also
+  authorizes uploads; the legacy upload-only session expires after 10 minutes.
 - Validate file type by content and extension, sanitize file names, set file-size limits, and prevent path traversal.
 - Treat document text as untrusted input. Serialize it as JSON, escape delimiter
   characters, keep it separate from the user question, and tell every provider

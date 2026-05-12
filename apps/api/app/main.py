@@ -5,7 +5,7 @@ from time import perf_counter
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .chat import ChatService
 from .config import get_settings
@@ -18,6 +18,8 @@ from .providers.openai import OpenAIProvider
 from .providers.router import ProviderRouter
 from .retrieval import RetrievalService
 from .schemas import (
+    AppLoginRequest,
+    AppSessionStatus,
     ChatDetail,
     ChatRequest,
     ChatSummary,
@@ -32,6 +34,12 @@ from .uploads import DocumentUploadService
 from .vector_store import VectorStore
 
 UPLOAD_SESSION_COOKIE = "heritage_upload_session"
+APP_SESSION_COOKIE = "heritage_app_session"
+PUBLIC_API_PATHS = {
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/session",
+}
 settings = get_settings()
 logger = configure_logging(settings.log_path, settings.log_level)
 database = Database(settings.sqlite_path)
@@ -60,6 +68,12 @@ chat_service = ChatService(retrieval, provider, database)
 upload_access = UploadAccess(
     password_hash=settings.upload_password_hash.get_secret_value(),
     session_ttl_seconds=settings.upload_session_ttl_seconds,
+    max_attempts=settings.upload_max_attempts,
+    attempt_window_seconds=settings.upload_attempt_window_seconds,
+)
+app_access = UploadAccess(
+    password_hash=settings.upload_password_hash.get_secret_value(),
+    session_ttl_seconds=settings.app_session_ttl_seconds,
     max_attempts=settings.upload_max_attempts,
     attempt_window_seconds=settings.upload_attempt_window_seconds,
 )
@@ -97,6 +111,21 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def require_app_session(request: Request, call_next):
+    if (
+        request.method != "OPTIONS"
+        and request.url.path.startswith("/api/")
+        and request.url.path not in PUBLIC_API_PATHS
+        and not app_access.is_unlocked(request.cookies.get(APP_SESSION_COOKIE))
+    ):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Enter the Heritage password to continue."},
+        )
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def request_logging(request: Request, call_next):
     request_id = request.headers.get("x-request-id", "")
     if not request_id or len(request_id) > 100 or not request_id.replace("-", "").isalnum():
@@ -121,10 +150,67 @@ async def request_logging(request: Request, call_next):
         )
 
 
+@app.post("/api/auth/login", response_model=AppSessionStatus)
+def login(
+    login_request: AppLoginRequest,
+    request: Request,
+    response: Response,
+) -> dict:
+    client_key = request.client.host if request.client else "local"
+    try:
+        token = app_access.unlock(login_request.password, client_key)
+    except InvalidUploadPassword as exc:
+        raise HTTPException(status_code=401, detail="The password is incorrect.") from exc
+    except UploadRateLimited as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="Login is temporarily unavailable. Try again later.",
+        ) from exc
+    response.set_cookie(
+        key=APP_SESSION_COOKIE,
+        value=token,
+        max_age=settings.app_session_ttl_seconds,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path="/api",
+    )
+    return {
+        "authenticated": True,
+        "expires_in_seconds": settings.app_session_ttl_seconds,
+    }
+
+
+@app.get("/api/auth/session", response_model=AppSessionStatus)
+def app_session(request: Request) -> dict:
+    authenticated = app_access.is_unlocked(
+        request.cookies.get(APP_SESSION_COOKIE)
+    )
+    return {
+        "authenticated": authenticated,
+        "expires_in_seconds": (
+            settings.app_session_ttl_seconds if authenticated else None
+        ),
+    }
+
+
+@app.post("/api/auth/logout", status_code=204)
+def logout(response: Response) -> Response:
+    response.delete_cookie(
+        key=APP_SESSION_COOKIE,
+        path="/api",
+        httponly=True,
+        samesite="lax",
+    )
+    response.status_code = 204
+    return response
+
+
 @app.get("/api/health")
 async def health(refresh: bool = False) -> dict:
     providers = await provider.health(refresh=refresh)
     models = provider.models_with_status()
+    indexed_documents = database.list_documents()
     available_models = [model for model in models if model["available"]]
     default_model = (
         settings.groq_model
@@ -154,7 +240,11 @@ async def health(refresh: bool = False) -> dict:
                 "description": "15 chunks · query expansion + full re-rank",
             },
         ],
-        "documents": len(database.list_documents()),
+        "documents": len(indexed_documents),
+        "pages": sum(
+            int(document["page_count"] or 0)
+            for document in indexed_documents
+        ),
         "chunks": vector_store.count,
         "api_key_configured": any(item["configured"] for item in providers),
     }
@@ -256,7 +346,10 @@ def unlock_uploads(
 
 @app.get("/api/uploads/session", response_model=UploadSessionStatus)
 def upload_session(request: Request) -> dict:
-    unlocked = upload_access.is_unlocked(request.cookies.get(UPLOAD_SESSION_COOKIE))
+    unlocked = (
+        app_access.is_unlocked(request.cookies.get(APP_SESSION_COOKIE))
+        or upload_access.is_unlocked(request.cookies.get(UPLOAD_SESSION_COOKIE))
+    )
     return {
         "unlocked": unlocked,
         "expires_in_seconds": settings.upload_session_ttl_seconds if unlocked else None,
@@ -268,7 +361,10 @@ async def upload_documents(
     request: Request,
     files: list[UploadFile] = File(...),
 ) -> IndexResult:
-    if not upload_access.is_unlocked(request.cookies.get(UPLOAD_SESSION_COOKIE)):
+    if not (
+        app_access.is_unlocked(request.cookies.get(APP_SESSION_COOKIE))
+        or upload_access.is_unlocked(request.cookies.get(UPLOAD_SESSION_COOKIE))
+    ):
         raise HTTPException(status_code=401, detail="Unlock document uploads first.")
     return await document_uploads.upload(files)
 

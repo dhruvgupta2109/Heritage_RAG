@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     upload_session_ttl_seconds: int = 600
     upload_max_attempts: int = 5
     upload_attempt_window_seconds: int = 600
+    app_session_ttl_seconds: int = 12 * 60 * 60
     upload_max_file_bytes: int = 25 * 1024 * 1024
     docs_dir: Path = PROJECT_ROOT / "DOCS"
     data_dir: Path = PROJECT_ROOT / "data"

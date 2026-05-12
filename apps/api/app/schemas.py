@@ -144,3 +144,12 @@ class UploadUnlockRequest(BaseModel):
 class UploadSessionStatus(BaseModel):
     unlocked: bool
     expires_in_seconds: int | None = None
+
+
+class AppLoginRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+
+
+class AppSessionStatus(BaseModel):
+    authenticated: bool
+    expires_in_seconds: int | None = None

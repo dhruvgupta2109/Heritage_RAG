@@ -10,5 +10,6 @@ __pycache__/
 data/chroma/
 data/heritage.db
 data/heritage.db-*
+data/logs/
+backups/
 apps/web/.next/
-

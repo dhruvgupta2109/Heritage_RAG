@@ -12,7 +12,12 @@
     "test:web": "npm run test --workspace @heritage/web",
     "test:api": "uv run --project apps/api pytest apps/api/tests",
     "index": "uv --directory apps/api run python -m app.cli index",
-    "eval": "uv --directory apps/api run python -m app.cli evaluate"
+    "eval": "uv --directory apps/api run python -m app.cli evaluate",
+    "eval:answers": "uv --directory apps/api run python -m app.cli evaluate-answers",
+    "benchmark": "uv --directory apps/api run python -m app.cli benchmark",
+    "backup": "uv --directory apps/api run python -m app.cli backup",
+    "backup:inspect": "uv --directory apps/api run python -m app.cli inspect-backup",
+    "restore": "uv --directory apps/api run python -m app.cli restore"
   },
   "dependencies": {
     "next": "16.2.12"

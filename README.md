@@ -1,6 +1,6 @@
 # Heritage RAG
 
-**Status:** Phases 0–4 complete; Phase 5 is next
+**Status:** Phases 0–5 complete; Phase 6 release hardening is in progress
 
 **Last updated:** 2026-07-30
 
@@ -67,11 +67,13 @@ npm run test:api
 npm run test:web
 npm run build
 npm run eval -- --mode medium
+npm run eval:answers
+npm run benchmark -- --documents 300 --queries 24
 ```
 
 The Phase 1 corpus test asks `What are the four components of experiential learning?` and expects `Experiential Learning at HXLS Noida | Learning by Doing.pdf`, Page 1. The verified answer identifies Experience, Reflection, Dialogue, and Understanding.
 
-## Implemented Through Phase 4
+## Implemented Through Phase 5
 
 Implemented:
 
@@ -101,18 +103,56 @@ Implemented:
 - Citation validation, source/page links, query-aware snippets, and **Answered from**.
 - Evidence confidence calculation and all five glass UI states.
 - Explicit no-evidence behavior with Very low confidence.
+- Persistent light/dark themes with reduced-motion and reduced-transparency
+  fallbacks.
+- Accessible confidence interaction through hover, keyboard focus, tap,
+  outside click, and Escape.
+- In-app source preview drawer with supporting snippets, direct document links,
+  and PDF page navigation.
+- A real Stop action that retains partial answer text without showing completed
+  evidence confidence.
+- Grounded starter prompts that submit immediately, query Copy/Edit-and-resend
+  actions, and response Copy/Retry actions with visible feedback.
 
-The current corpus includes a 25-question evaluation set covering expected
-document/page retrieval and explicit no-answer cases. Optional
-Anthropic/Ollama adapters and broader confidence calibration are later work.
-The OpenAI and Gemini adapters are implemented and contract-tested; their live
-authentication check is an operational follow-up once valid keys are supplied,
-not a blocker for starting Phase 5.
+## Phase 6 Hardening Implemented
+
+- Labeled deterministic answer cases for direct, multi-source, partial,
+  conflicting, absent, and adversarial-document evidence.
+- Confidence calibration that caps partial support at Medium and conflicting
+  evidence at Low, with regression coverage.
+- JSON-encoded untrusted evidence, delimiter escaping, and malicious-document
+  prompt-injection tests.
+- Rotating structured local logs with sensitive-field and secret-value
+  redaction.
+- Checksummed backup, inspection, and protected restore commands for `DOCS/`,
+  Chroma, and SQLite.
+- A repeatable isolated 300-document local embedding/retrieval benchmark with
+  recorded results in `evals/results/`.
+- Complete local operations, troubleshooting, provider/privacy disclosure, and
+  known-limitations guides.
+
+Current baselines are 18/21 expected document/page hits in Quick and 21/21 in
+Medium and Deep. The six deterministic labeled answer cases pass citation
+precision, groundedness, confidence, and no-answer checks. Optional
+Anthropic/Ollama adapters remain later work. OpenAI and Gemini live
+authentication remains dependent on valid credentials.
+
+## Backup and Recovery
+
+```bash
+npm run backup
+npm run backup:inspect -- --archive /path/to/heritage.zip
+npm run restore -- --archive /path/to/heritage.zip --replace
+```
+
+Stop the application and create a current backup before a replacement restore.
+See the operations guide for the full recovery procedure.
 
 ## Current Limitations
 
 - OCR is intentionally excluded from the current scope.
-- Confidence thresholds are initial values and still need evaluation-set calibration.
+- Confidence is calibrated on a small deterministic suite and should be
+  recalibrated as the real corpus and observed answer patterns grow.
 - The current stable Next.js release includes a transitive PostCSS security advisory. Heritage does not accept or process user-supplied CSS and binds to localhost, but the dependency should be upgraded when Next.js ships a patched stable release.
 
 ## Documentation
@@ -123,3 +163,6 @@ not a blocker for starting Phase 5.
 - [Delivery phases](mds/Phases.md)
 - [Engineering rules](mds/Rules.md)
 - [Project memory](mds/Memory.md)
+- [Local operations and recovery](mds/Operations.md)
+- [Privacy and provider disclosure](mds/Privacy.md)
+- [Known limitations](mds/Limitations.md)

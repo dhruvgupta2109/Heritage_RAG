@@ -1,6 +1,6 @@
 # Heritage RAG — Project Rules
 
-**Status:** Current for completed Phases 0–4; Phase 5 next
+**Status:** Current for completed Phases 0–5 and Phase 6 hardening
 
 **Last updated:** 2026-07-30
 
@@ -81,6 +81,10 @@ These rules turn the PRD into mandatory engineering and product constraints. If 
 - Treat document contents as untrusted prompt input. Delimit evidence and prevent it from changing system or security instructions.
 - Do not log passwords, tokens, API keys, raw document bodies, or full prompts/answers by default.
 - Clearly disclose when a cloud provider will receive retrieved document text.
+- Encode retrieved source text as untrusted data, prevent it from closing its
+  structural delimiter, and explicitly reject instructions found inside it.
+- Backups must exclude `.env` and logs, carry checksums, reject path traversal,
+  and require explicit replacement before overwriting non-empty runtime data.
 
 ## 7. UX and Accessibility
 
@@ -106,6 +110,9 @@ These rules turn the PRD into mandatory engineering and product constraints. If 
 - Run formatting, linting, type checking, and tests before declaring a phase complete.
 - Add a regression test for every production bug fixed.
 - Do not silently swallow errors; return safe user messages and retain useful redacted diagnostics.
+- Structured logs may contain request/chat/message IDs, provider/model,
+  retrieval mode, latency, chunk IDs, and confidence factors, but never raw
+  questions, answers, source bodies, cookies, passwords, or provider secrets.
 
 ## 9. Documentation and Change Control
 

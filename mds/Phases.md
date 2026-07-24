@@ -1,6 +1,6 @@
 # Heritage RAG — Delivery Phases
 
-**Status:** Phases 0–4 complete; Phase 5 next
+**Status:** Phases 0–5 complete; Phase 6 in progress
 
 **Last updated:** 2026-07-30
 
@@ -149,9 +149,28 @@ Exit criteria:
 - Rename/delete behavior is keyboard accessible.
 - Missing or replaced source files show a clear unavailable state without rewriting history.
 
-## Phase 5 — Glass UI and Accessibility
+## Phase 5 — Glass UI and Accessibility ✅
 
 **Goal:** Deliver the polished visual system and complete trust interactions.
+
+Current progress:
+
+- Complete: shared glass, theme, radius, spacing, focus, and motion tokens.
+- Complete: persistent light/dark themes and reduced-transparency/motion fallbacks.
+- Complete: responsive desktop, tablet, mobile, and 360 px layout rules.
+- Complete: five-state confidence badge with AA-tested light/dark colors,
+  non-color icons, full labels, and active-state treatment.
+- Complete: hover, keyboard-focus, tap, outside-click, and Escape confidence behavior.
+- Complete: always-visible Low/Very low rationale.
+- Complete: accessible in-app source drawer with focus containment/restoration,
+  cited-page preview, page controls, and original-file access.
+- Complete: focus containment and return-focus behavior for rename, delete, and
+  document-upload dialogs.
+- Complete: loading, empty, stopped-stream, error, and no-evidence states.
+- Complete: immediate-submit grounded prompts and accessible query
+  Copy/Edit-and-resend plus response Copy/Retry actions.
+- Complete: user-verified visual and keyboard behavior at 360 px, tablet, and
+  desktop widths in both themes.
 
 Deliverables:
 
@@ -175,6 +194,25 @@ Exit criteria:
 ## Phase 6 — Evaluation and Release Hardening
 
 **Goal:** Make the local v1 reliable, measurable, and ready for daily use.
+
+Current progress:
+
+- Complete: deterministic labeled answer evaluation for direct, partial,
+  conflicting, absent, and adversarial-document evidence.
+- Complete: calibrated partial-support and conflict caps plus regression tests
+  for all five public confidence bands.
+- Complete: prompt-injection hardening with untrusted JSON evidence,
+  delimiter escaping, citation allowlisting, and malicious-document tests.
+- Complete: structured JSON Lines request/chat logs with field- and
+  value-level sensitive-data redaction.
+- Complete: versioned, checksummed backup/inspect/restore utilities for
+  documents, Chroma, and SQLite.
+- Complete: repeatable synthetic 300-document performance benchmark and recorded
+  local results.
+- Complete: setup, operations, troubleshooting, privacy/provider disclosure,
+  and known-limitations documentation.
+- Pending release sign-off: connected daily-use verification and acceptance of
+  the documented limitations.
 
 Deliverables:
 

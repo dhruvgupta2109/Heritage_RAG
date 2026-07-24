@@ -1,6 +1,6 @@
 # RAG Knowledge Assistant — Product Requirements Document
 
-**Status:** v1.4 — Phases 0–4 complete; Phase 5 next
+**Status:** v1.5 — Phases 0–5 complete; Phase 6 release hardening in progress
 **Owner:** You
 **Target environment:** Localhost (single user, local machine)
 **Last updated:** 2026-07-30
@@ -47,6 +47,9 @@ A locally-hosted chat application that lets you ask questions over a folder of y
 ### 5.1 Chat Interface
 - Central chat window, ChatGPT-style bubbles, streaming token-by-token responses.
 - Input bar pinned at the bottom with the two selectors built into it (like ChatGPT's tools row).
+- Grounded empty-state suggestions submit immediately when selected.
+- User queries provide Copy and Edit-and-resend actions; assistant responses
+  provide Copy and Retry actions with accessible labels and visible feedback.
 - Answers use the clearest question-appropriate Markdown structure: concise
   prose for simple answers, bullets for sets, numbered lists for ordered steps,
   compact tables for comparisons or shared attributes, and short headings only
@@ -225,9 +228,14 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
 3. **Password-protected upload — complete** — add-to-index flow from the UI.
 4. **Chat history — complete** — sidebar, persistence, date grouping,
    rename/delete, and pin/unpin.
-5. **Glass UI polish — next** — final visual pass, answer source treatment,
+5. **Glass UI polish — complete** — final visual pass, answer source treatment,
    confidence badge/popover, light/dark mode, accessibility, and
    animations/transitions.
+6. **Evaluation and release hardening — in progress** — labeled answer and
+   confidence regression, adversarial-document defenses, structured redacted
+   logs, local recovery tools, 300-document performance measurement, and
+   operations/privacy/limitations documentation are implemented; connected
+   daily-use sign-off remains.
 
 ## 11. Open Questions
 
@@ -237,6 +245,6 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
 
 ---
 
-*Next step: begin Phase 5 UI/accessibility hardening. Live OpenAI/Gemini
-authentication can be checked independently when valid credentials are
-supplied.*
+*Next step: complete Phase 6 connected release sign-off and accept the documented
+v1 limitations. Live OpenAI/Gemini authentication can be checked independently
+when valid credentials are supplied.*

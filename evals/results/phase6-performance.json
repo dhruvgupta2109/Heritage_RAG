@@ -1,0 +1,43 @@
+{
+  "measured_at": "2026-07-30",
+  "environment": "Local macOS development machine",
+  "kind": "synthetic-local-retrieval",
+  "documents": 300,
+  "chunks": 300,
+  "queries_per_mode": 24,
+  "indexing_seconds": 3.142,
+  "peak_rss_mib": 937.4,
+  "modes": {
+    "quick": {
+      "latency_ms": {
+        "p50": 66.28,
+        "p95": 68.56,
+        "max": 68.61
+      }
+    },
+    "medium": {
+      "latency_ms": {
+        "p50": 65.66,
+        "p95": 68.89,
+        "max": 69.21
+      }
+    },
+    "deep": {
+      "latency_ms": {
+        "p50": 66.7,
+        "p95": 68.77,
+        "max": 71.7
+      }
+    }
+  },
+  "targets": {
+    "retrieval_p95_ms": 2000,
+    "indexing_seconds": 120
+  },
+  "passed": true,
+  "notes": [
+    "Measures local embedding, Chroma indexing, and retrieval only.",
+    "Corpus retrieval correctness is measured separately by questions.json.",
+    "Cloud-provider generation latency and real-document parsing are excluded."
+  ]
+}

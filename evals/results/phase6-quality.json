@@ -1,0 +1,27 @@
+{
+  "measured_at": "2026-07-30",
+  "retrieval": {
+    "case_count": 25,
+    "answerable_case_count": 21,
+    "absent_case_count": 4,
+    "quick_hit_rate": 0.857,
+    "medium_hit_rate": 1.0,
+    "deep_hit_rate_without_provider_expansion": 1.0
+  },
+  "labeled_answers": {
+    "case_count": 6,
+    "evidence_states": [
+      "direct",
+      "partial",
+      "conflicting",
+      "absent"
+    ],
+    "includes_adversarial_document": true,
+    "citation_precision": 1.0,
+    "answer_groundedness": 1.0,
+    "confidence_accuracy": 1.0,
+    "no_answer_accuracy": 1.0,
+    "passed": true
+  },
+  "scope": "Deterministic local regression suite; live provider wording is checked separately when valid provider credentials are available."
+}

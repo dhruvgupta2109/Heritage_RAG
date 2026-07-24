@@ -1,6 +1,6 @@
 # Heritage RAG — Product Design System
 
-**Status:** Phases 0–4 interaction baseline implemented; Phase 5 polish and accessibility audit next
+**Status:** Phase 5 complete; unchanged by Phase 6 backend hardening
 
 **Applies to:** Web UI v1
 
@@ -17,6 +17,19 @@ Principles:
 - **Honest uncertainty:** weak or missing evidence is visible without opening a tooltip.
 - **Consistent glass:** blur, tint, border, and shadow come from shared tokens.
 - **Accessible by default:** all hover behavior also works by keyboard focus and tap.
+
+Phase 5 completion record:
+
+- Implemented: shared theme/motion/radius tokens, persistent light/dark theme,
+  opaque fallbacks, and responsive desktop/tablet/mobile rules.
+- Implemented: hover/focus/tap confidence popover with outside-click and Escape
+  dismissal plus AA-tested confidence colors.
+- Implemented: source drawer with focus containment, focus restoration,
+  supporting passage, page navigation, and original-file access.
+- Implemented: stopped-stream state that preserves partial answer text without
+  presenting completed confidence.
+- Verified by the user: visual and keyboard behavior at 360 px, tablet, and
+  desktop widths in the connected local application.
 
 ## 2. Application Layout
 
@@ -108,6 +121,14 @@ If `backdrop-filter` is unavailable or reduced transparency is enabled, use the 
 - While streaming, the send control becomes a stop control.
 
 ### 4.4 Messages and answers
+
+- Grounded empty-state suggestions submit immediately when selected.
+- User queries expose compact **Copy** and **Edit** actions. Edit moves the
+  query into a labeled composer state for revision and resubmission.
+- Completed, stopped, and failed assistant turns expose **Retry**; responses
+  with text also expose **Copy** with temporary confirmation.
+- Message actions remain visible and operable by keyboard and touch, not only
+  on hover.
 
 User messages use a subtle tinted bubble. Assistant answers sit on a quiet glass surface or directly on the conversation canvas with enough separation to scan.
 

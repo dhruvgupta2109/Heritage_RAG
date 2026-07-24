@@ -4,12 +4,17 @@ This file is the concise handoff record for future work. Update it whenever a de
 
 **Last updated:** 2026-07-30
 
-**Current phase:** Phases 0–4 complete; Phase 5 is ready to start
+**Current phase:** Phases 0–5 complete; Phase 6 release hardening is in progress
 
 **Implementation status:** Runnable local multi-provider RAG app with Groq
 generation, availability-aware OpenAI/Gemini adapters, local hybrid/full re-ranking, Deep
 query decomposition, citations, confidence, evaluation data, password-gated
 document uploads, persistent chat actions, and a connected glass chat UI.
+Phase 5 includes persistent light/dark themes, accessible confidence
+interaction, an in-app source/page drawer, and stopped-stream preservation.
+Phase 6 now includes deterministic answer/confidence evaluation,
+malicious-document defenses, structured redacted logs, recovery tooling, and a
+recorded 300-document local performance benchmark.
 
 ## Current Product Definition
 
@@ -49,6 +54,12 @@ Heritage RAG is a single-user, localhost document assistant with:
   hash, with a 10-minute HTTP-only session and five-attempt rate limit.
 - Uploaded files are limited to 25 MB each and PDF, DOCX, TXT, or MD.
 - OCR is not required for the current corpus.
+- Partial evidence is capped at Medium confidence and acknowledged conflicting
+  evidence is capped at Low confidence.
+- Runtime logs are rotating JSON Lines with sensitive fields and secret-shaped
+  values redacted. Raw questions, answers, and document bodies are not logged.
+- Backups include documents, Chroma, and a consistent SQLite snapshot, but
+  exclude `.env` and logs.
 
 ## Phases 0–4 Completed
 
@@ -90,10 +101,35 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Added date-grouped history for pinned chats, Today, Yesterday, Previous 7
   days, Previous 30 days, and older month/year groups.
 - Hid the Next.js development indicator from the app preview.
-- Added 34 passing backend tests, seven focused web rendering/interaction tests,
+- Added 34 passing backend tests, 13 focused web rendering/interaction tests,
   and a successful production frontend build.
 - Verified the known answer: Experience, Reflection, Dialogue, and Understanding from `Experiential Learning at HXLS Noida | Learning by Doing.pdf`, Page 1, with High confidence.
 - Verified an unrelated query returns no source and Very low confidence.
+
+## Phase 6 Work Implemented
+
+- Added `evals/answer_cases.json` with labeled direct, partial, conflicting,
+  absent, multi-source, and adversarial-document answer cases.
+- Added deterministic scoring for citation precision, answer groundedness,
+  confidence accuracy, expected answer terms, and no-answer behavior.
+- Calibrated confidence with completeness and contradiction factors; partial
+  support cannot exceed 74/Medium and conflict cannot exceed 54/Low.
+- Hardened provider prompts by treating document text as JSON-encoded untrusted
+  data, escaping structural delimiters, and rejecting instructions embedded in
+  sources.
+- Added structured request, retrieval, completion, and failure logs with
+  request IDs, latency, provider/model, chunk IDs, and confidence factors.
+- Added field/value redaction and rotating local log files.
+- Added versioned ZIP backup, checksum inspection, path-safe restore, consistent
+  SQLite snapshotting, and explicit replacement protection.
+- Added a repeatable isolated 300-document Chroma benchmark. The recorded run
+  indexed 300 synthetic documents in 3.142 seconds; retrieval p95 was
+  68.56 ms Quick, 68.89 ms Medium, and 68.77 ms Deep on the local development
+  machine.
+- Recorded the quality baseline: Quick 18/21, Medium 21/21, Deep 21/21 expected
+  document/page hits; deterministic labeled answer metrics are all 100%.
+- Added operations, privacy/provider disclosure, and known-limitations guides.
+- Expanded backend coverage from 34 to 42 passing tests.
 
 ## Documentation Completed
 
@@ -117,17 +153,19 @@ These decisions should be captured in the PRD, Architecture, and this file when 
 
 ## Next Recommended Work
 
-1. Start Phase 5 glass UI, responsive, dark-theme, and accessibility hardening.
+1. Run final connected web/API verification, then obtain release sign-off on
+   the documented v1 limitations.
 2. When valid OpenAI/Gemini credentials are available, run the optional live
    authentication checks; this is not a Phase 5 prerequisite.
-3. Expand and calibrate the evaluation set as more documents are added.
+3. Expand and recalibrate the evaluation set as more documents are added.
 
 ## Known Risks
 
 - PDF text extraction and displayed page labels may differ for scanned or front-matter-heavy documents.
 - DOCX/TXT/MD do not always have stable native pages.
 - LLM-generated citation markers can be invalid unless checked against retrieved chunk IDs.
-- Confidence scores will need calibration against a labeled evaluation set.
+- Confidence calibration currently relies on a small deterministic labeled set;
+  expand it as real answer and conflict patterns are observed.
 - Cloud providers receive retrieved document text; the UI and setup guide must disclose this.
 - Glass/translucent visuals can fail contrast requirements without opaque fallbacks.
 - Next.js 16.2.12 currently includes a transitive PostCSS advisory. Current use is localhost-only with repository-controlled CSS; upgrade when a patched stable Next.js version is available.
@@ -136,6 +174,27 @@ These decisions should be captured in the PRD, Architecture, and this file when 
 
 ### 2026-07-30
 
+- Started Phase 6 release hardening with labeled answer evaluation, calibrated
+  partial/conflict confidence behavior, prompt-injection defenses, structured
+  redacted logs, backup/restore tooling, a 300-document performance benchmark,
+  and complete local operations/privacy/limitations documentation.
+- Completed Phase 5 after user verification of the responsive visual and
+  keyboard experience at mobile, tablet, and desktop sizes.
+- Started Phase 5 with shared visual tokens, persistent light/dark themes,
+  dark-theme component surfaces, and reduced-effect fallbacks.
+- Added accessible confidence popover state for hover, focus, tap,
+  outside-click, and Escape behavior.
+- Added an in-app source drawer with focus containment/restoration, cited-page
+  preview, page navigation, and original-file access.
+- Added modal focus containment and return-focus behavior for rename, delete,
+  and document-upload dialogs.
+- Added answer-stream cancellation with retained partial text and an explicit
+  **Stopped** state that does not display completed confidence.
+- Added immediate-submit grounded prompts plus query Copy/Edit-and-resend and
+  response Copy/Retry actions with copied/editing feedback.
+- Expanded web coverage to 13 tests, including grounded starter prompts,
+  theme/responsive modes, and AA
+  contrast checks for every confidence state in both themes.
 - Completed Phase 3 with real per-file upload progress, processing/indexing
   feedback, independent final outcomes, expired-session recovery, and retry.
 - Completed Phase 4 with calendar date-grouped history.

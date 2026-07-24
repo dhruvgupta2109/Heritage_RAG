@@ -2,7 +2,7 @@
 
 > This filename is retained for compatibility. The canonical project architecture is defined here.
 
-**Status:** Pre-Phase-5 architecture implemented (Phases 0–4 complete)
+**Status:** Phases 0–5 implemented; Phase 6 release hardening in progress
 
 **Target:** Single-user localhost application
 
@@ -79,9 +79,13 @@ Runtime data and `.env` files must be gitignored.
 - Send `message`, `chat_id`, `model`, and `retrieval_mode`.
 - Render streaming text separately from final citations/confidence.
 - Render inline citation markers and an **Answered from** footer.
-- Open a source preview at the cited page where the source format permits.
+- Open an accessible in-app source drawer at the cited page where the source
+  format permits, with previous/next page controls and an original-file link.
 - Provide equivalent hover, keyboard-focus, and tap access to the confidence legend.
 - Rehydrate a historical message from stored source and confidence snapshots.
+- Persist a device-local light/dark theme preference without sending it to the API.
+- Abort an active answer stream on user request, preserve partial text as
+  **Stopped**, and omit completed confidence/source metadata.
 
 ### 4.2 API and chat orchestrator
 
@@ -133,6 +137,12 @@ The confidence evaluator produces:
 - `factors`: diagnostic evidence signals for development and testing
 
 Initial score inputs are citation coverage, retrieval/re-ranker strength, agreement between sources, directness of support, and source-location quality. Contradictions, unsupported claims, missing locators, and an explicit no-answer result apply penalties. Hard rules override the numeric result: no supporting source is Very low; partially supported answers cannot exceed Medium.
+
+Phase 6 adds explicit completeness and contradiction factors. Partial support is
+capped at 74/Medium, conflicting evidence at 54/Low, and absent or uncited
+evidence remains Very low. The generated answer must acknowledge the gap or
+conflict for automatic inference; deterministic evaluation can supply the
+labeled evidence state directly.
 
 ## 5. Core Data Contracts
 
@@ -250,7 +260,9 @@ send the existing `chat_id`; title generation is not repeated.
 - The local default password is `Password`, represented only by a configurable
   bcrypt hash. The upload session expires after 10 minutes.
 - Validate file type by content and extension, sanitize file names, set file-size limits, and prevent path traversal.
-- Treat document text as untrusted input and delimit it from system instructions to reduce prompt-injection risk.
+- Treat document text as untrusted input. Serialize it as JSON, escape delimiter
+  characters, keep it separate from the user question, and tell every provider
+  not to follow instructions embedded in a source.
 - Avoid logging document contents, prompts, provider keys, passwords, or full streamed answers by default.
 - Make external provider use explicit because retrieved text leaves the machine when a cloud model or embedding provider is selected.
 
@@ -260,12 +272,31 @@ send the existing `chat_id`; title generation is not repeated.
 - A failed upload never makes a partially indexed document appear ready.
 - Chat requests have timeouts and cancellation; provider errors use a common UI-safe error shape.
 - Structured local logs include request ID, chat ID, provider, retrieval mode, latency, chunk IDs, and confidence factors, but not sensitive content.
+- JSON Lines logs rotate locally at 5 MB with three archives. Field- and
+  value-level redaction removes keys, authorization values, cookies, upload
+  passwords, tokens, prompts/questions, answers, and document content.
 - Health checks cover SQLite and Chroma availability; provider availability is reported separately.
 - Provider health checks verify both key authentication and whether each
   configured model appears in that key's model catalog. Unavailable models are
   visible but disabled in the client.
 
-## 10. Architecture Decisions and Defaults
+## 10. Evaluation, Performance, and Recovery
+
+- `evals/questions.json` scores expected document/page retrieval for the real
+  corpus in Quick, Medium, and Deep modes.
+- `evals/answer_cases.json` deterministically scores citation precision,
+  groundedness, confidence labels, and no-answer behavior across direct,
+  partial, conflicting, absent, and adversarial evidence.
+- The synthetic benchmark creates an isolated temporary Chroma collection with
+  300 documents and measures local embedding/indexing plus p50/p95 retrieval.
+  It never modifies the production collection.
+- Backups are versioned ZIP archives containing `DOCS/`, a consistent SQLite
+  snapshot, Chroma files, a manifest, and per-file SHA-256 checksums. Secrets
+  and logs are excluded.
+- Restore validates version, paths, presence, and checksums before changing a
+  target and refuses non-empty targets without explicit replacement.
+
+## 11. Architecture Decisions and Defaults
 
 - Next.js + Tailwind CSS for the web UI.
 - FastAPI for the backend.

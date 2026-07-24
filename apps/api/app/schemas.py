@@ -6,6 +6,7 @@ from pydantic.functional_validators import field_validator
 from .config import MODEL_IDS
 
 ConfidenceLevel = Literal["very_high", "high", "medium", "low", "very_low"]
+EvidenceState = Literal["direct", "partial", "conflicting", "absent"]
 RetrievalMode = Literal["quick", "medium", "deep"]
 
 
@@ -55,6 +56,8 @@ class ConfidenceFactors(BaseModel):
     retrieval_strength: float = Field(ge=0, le=1)
     source_agreement: float = Field(ge=0, le=1)
     location_quality: float = Field(ge=0, le=1)
+    completeness: float = Field(default=1.0, ge=0, le=1)
+    contradiction: float = Field(default=0.0, ge=0, le=1)
 
 
 class ConfidenceResult(BaseModel):

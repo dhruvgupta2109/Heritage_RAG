@@ -1,5 +1,7 @@
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+from time import perf_counter
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +11,7 @@ from .chat import ChatService
 from .config import get_settings
 from .database import Database
 from .ingestion import IngestionService
+from .observability import configure_logging, log_event
 from .providers.gemini import GeminiProvider
 from .providers.groq import GroqProvider
 from .providers.openai import OpenAIProvider
@@ -30,6 +33,7 @@ from .vector_store import VectorStore
 
 UPLOAD_SESSION_COOKIE = "heritage_upload_session"
 settings = get_settings()
+logger = configure_logging(settings.log_path, settings.log_level)
 database = Database(settings.sqlite_path)
 vector_store = VectorStore(settings.chroma_path, settings.collection_name)
 ingestion = IngestionService(settings.docs_dir, database, vector_store)
@@ -90,6 +94,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def request_logging(request: Request, call_next):
+    request_id = request.headers.get("x-request-id", "")
+    if not request_id or len(request_id) > 100 or not request_id.replace("-", "").isalnum():
+        request_id = uuid.uuid4().hex
+    request.state.request_id = request_id
+    started = perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        log_event(
+            logger,
+            "http.request.completed",
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            status_code=status_code,
+            latency_ms=round((perf_counter() - started) * 1000, 2),
+        )
 
 
 @app.get("/api/health")
@@ -245,9 +274,12 @@ async def upload_documents(
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest) -> StreamingResponse:
+async def chat_stream(chat_request: ChatRequest, request: Request) -> StreamingResponse:
     return StreamingResponse(
-        chat_service.stream(request),
+        chat_service.stream(
+            chat_request,
+            request_id=getattr(request.state, "request_id", None),
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

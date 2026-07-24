@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 7
     retrieval_candidate_k: int = 14
     minimum_relevance: float = 0.28
+    log_level: str = "INFO"
 
     @property
     def sqlite_path(self) -> Path:
@@ -85,6 +86,10 @@ class Settings(BaseSettings):
     @property
     def chroma_path(self) -> Path:
         return self.data_dir / "chroma"
+
+    @property
+    def log_path(self) -> Path:
+        return self.data_dir / "logs" / "heritage.jsonl"
 
     def ensure_directories(self) -> None:
         self.docs_dir.mkdir(parents=True, exist_ok=True)

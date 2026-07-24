@@ -1,16 +1,22 @@
 import json
+import logging
 import re
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from time import perf_counter
 
 from .confidence import evaluate_confidence, sanitize_answer
+from .config import MODEL_CATALOG
 from .database import Database
+from .observability import log_event
 from .providers.base import AnswerProvider
 from .retrieval import RetrievalService
 from .schemas import AnsweredFrom, AnswerPayload, ChatRequest, SourceRecord
 
 NO_SUPPORT_ANSWER = "I couldn't find reliable support for this in the indexed documents."
+MODEL_PROVIDERS = {str(item["id"]): str(item["provider"]) for item in MODEL_CATALOG}
+logger = logging.getLogger("heritage")
 
 
 class ChatService:
@@ -24,9 +30,15 @@ class ChatService:
         self.provider = provider
         self.database = database
 
-    async def stream(self, request: ChatRequest) -> AsyncIterator[str]:
+    async def stream(
+        self,
+        request: ChatRequest,
+        request_id: str | None = None,
+    ) -> AsyncIterator[str]:
+        started = perf_counter()
         message_id = f"msg_{uuid.uuid4().hex}"
         selected_model = request.model or self.provider.model
+        provider_name = MODEL_PROVIDERS.get(selected_model, "unknown")
         now = datetime.now(UTC).isoformat()
 
         if request.chat_id:
@@ -46,6 +58,17 @@ class ChatService:
                 title = _fallback_title(request.message)
             chat = self.database.create_chat(chat_id, title, now)
             yield _sse("chat.created", chat)
+
+        log_event(
+            logger,
+            "chat.answer.started",
+            request_id=request_id,
+            chat_id=chat_id,
+            message_id=message_id,
+            provider=provider_name,
+            model=selected_model,
+            retrieval_mode=request.retrieval_mode,
+        )
 
         user_message_id = f"msg_{uuid.uuid4().hex}"
         self.database.save_user_message(
@@ -76,10 +99,24 @@ class ChatService:
             except Exception:
                 expanded_queries = []
 
+        retrieval_started = perf_counter()
         result = self.retrieval.retrieve_with_mode(
             request.message,
             request.retrieval_mode,
             expanded_queries,
+        )
+        log_event(
+            logger,
+            "chat.retrieval.completed",
+            request_id=request_id,
+            chat_id=chat_id,
+            message_id=message_id,
+            retrieval_mode=request.retrieval_mode,
+            latency_ms=round((perf_counter() - retrieval_started) * 1000, 2),
+            chunk_ids=[source.chunk_id for source in result.sources],
+            source_count=len(result.sources),
+            query_count=result.query_count,
+            strategy=result.strategy,
         )
         yield _sse(
             "retrieval.completed",
@@ -109,6 +146,18 @@ class ChatService:
                     parts.append(delta)
                     yield _sse("answer.delta", {"text": delta})
             except Exception as exc:
+                log_event(
+                    logger,
+                    "chat.answer.failed",
+                    level=logging.ERROR,
+                    request_id=request_id,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    provider=provider_name,
+                    model=selected_model,
+                    retrieval_mode=request.retrieval_mode,
+                    error_type=type(exc).__name__,
+                )
                 yield _sse("error", {"message": str(exc)})
                 return
             raw_answer = "".join(parts).strip() or NO_SUPPORT_ANSWER
@@ -138,6 +187,21 @@ class ChatService:
             confidence=payload.confidence.model_dump(),
             status=payload.status,
             created_at=datetime.now(UTC).isoformat(),
+        )
+        log_event(
+            logger,
+            "chat.answer.completed",
+            request_id=request_id,
+            chat_id=chat_id,
+            message_id=message_id,
+            provider=provider_name,
+            model=selected_model,
+            retrieval_mode=request.retrieval_mode,
+            latency_ms=round((perf_counter() - started) * 1000, 2),
+            citation_count=len(cited_sources),
+            confidence_score=confidence.score,
+            confidence_level=confidence.level,
+            confidence_factors=confidence.factors.model_dump(),
         )
         yield _sse(
             "answer.completed",

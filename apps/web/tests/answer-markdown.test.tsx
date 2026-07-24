@@ -230,3 +230,163 @@ test("document uploads expose real per-file progress, indexing, and retry states
   assert.ok(css.includes(".file-retry"));
   assert.ok(css.includes(".file-error"));
 });
+
+test("citations can open the in-app source preview", () => {
+  const html = renderToStaticMarkup(
+    <AnswerMarkdown
+      content="Supported answer [1]."
+      sources={[source]}
+      onSourceSelect={() => undefined}
+    />,
+  );
+
+  assert.match(html, /<button class="citation"/);
+  assert.match(html, /aria-label="Source 1: Formatting Guide, Page 3"/);
+});
+
+test("Phase 5 theme, stop, confidence, and source interactions are wired", () => {
+  const page = readFileSync(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const layout = readFileSync(
+    new URL("../app/layout.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(layout, /heritage-theme/);
+  assert.match(layout, /prefers-color-scheme: dark/);
+  assert.match(page, /className="theme-toggle"/);
+  assert.match(page, /answerAbortRef\.current\?\.abort\(\)/);
+  assert.match(page, /Stopped — partial answer retained/);
+  assert.match(page, /className="source-drawer glass-strong"/);
+  assert.match(page, /aria-label="Source page navigation"/);
+  assert.match(page, /aria-expanded=\{open\}/);
+  assert.match(page, /handleOutsidePointer/);
+  assert.match(page, /containModalFocus/);
+  assert.match(page, /returnFocus\?\.focus\(\)/);
+});
+
+test("empty state offers three questions grounded in the indexed corpus", () => {
+  const page = readFileSync(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    page,
+    /What are the four components of experiential learning\?/,
+  );
+  assert.match(
+    page,
+    /Compare Heritage's CBSE offering with a typical CBSE school in a table\./,
+  );
+  assert.match(
+    page,
+    /In one concise paragraph, explain why hands-on learning is not always the same as experiential learning\./,
+  );
+  assert.match(page, /starterPrompts\.map/);
+  assert.match(page, /sendMessage\(undefined, prompt\.question\)/);
+});
+
+test("queries and responses expose familiar edit, copy, and retry actions", () => {
+  const page = readFileSync(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const css = readFileSync(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    page,
+    /aria-label=\{copied \? "Query copied" : "Copy query"\}/,
+  );
+  assert.match(page, /aria-label="Edit and resend query"/);
+  assert.match(
+    page,
+    /aria-label=\{copied \? "Response copied" : "Copy response"\}/,
+  );
+  assert.match(page, /aria-label="Retry response"/);
+  assert.match(page, /function copyToClipboard/);
+  assert.match(page, /function editQuery/);
+  assert.match(page, /function retryResponse/);
+  assert.ok(css.includes(".message-actions"));
+  assert.ok(css.includes(".edit-context"));
+});
+
+test("Phase 5 stylesheet includes dark, responsive, and reduced-effect modes", () => {
+  const css = readFileSync(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(css, /html\[data-theme="dark"]\s*\{/);
+  assert.match(css, /@media \(min-width: 761px\) and \(max-width: 1100px\)/);
+  assert.match(css, /@media \(max-width: 760px\)/);
+  assert.match(css, /@media \(max-width: 480px\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css, /@media \(prefers-reduced-transparency: reduce\)/);
+  assert.ok(css.includes(".source-drawer"));
+  assert.ok(css.includes(".confidence-wrap.is-open .confidence-popover"));
+});
+
+test("confidence colors meet AA contrast in both themes", () => {
+  const css = readFileSync(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+  const lightBlock = css.match(/:root\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const darkBlock =
+    css.match(/html\[data-theme="dark"]\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const tokens = ["very-high", "high", "medium", "low", "very-low"];
+
+  function token(block: string, name: string) {
+    const value = block.match(
+      new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`),
+    )?.[1];
+    assert.ok(value, `Missing confidence token: ${name}`);
+    return value;
+  }
+
+  function luminance(hex: string) {
+    const channels = hex
+      .match(/[0-9a-fA-F]{2}/g)!
+      .map((value) => Number.parseInt(value, 16) / 255)
+      .map((value) =>
+        value <= 0.03928
+          ? value / 12.92
+          : ((value + 0.055) / 1.055) ** 2.4,
+      );
+    return (
+      0.2126 * channels[0] +
+      0.7152 * channels[1] +
+      0.0722 * channels[2]
+    );
+  }
+
+  function contrast(foreground: string, background: string) {
+    const foregroundLuminance = luminance(foreground);
+    const backgroundLuminance = luminance(background);
+    return (
+      (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+      (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+    );
+  }
+
+  for (const name of tokens) {
+    assert.ok(
+      contrast(token(lightBlock, name), "#ffffff") >= 4.5,
+      `${name} fails light-theme AA contrast`,
+    );
+    assert.ok(
+      contrast(token(darkBlock, name), "#1b1f2d") >= 4.5,
+      `${name} fails dark-theme AA contrast`,
+    );
+    assert.ok(
+      contrast("#172034", token(darkBlock, name)) >= 4.5,
+      `${name} score fails dark-theme AA contrast`,
+    );
+  }
+});

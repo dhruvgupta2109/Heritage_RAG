@@ -1,4 +1,9 @@
-from app.confidence import evaluate_confidence, level_for_score, sanitize_answer
+from app.confidence import (
+    evaluate_confidence,
+    infer_evidence_state,
+    level_for_score,
+    sanitize_answer,
+)
 from app.schemas import SourceRecord
 
 
@@ -94,3 +99,26 @@ def test_strong_cited_answer_is_high_or_better() -> None:
         retrieved_sources=[evidence],
     )
     assert result.level in {"high", "very_high"}
+
+
+def test_partial_support_cannot_exceed_medium() -> None:
+    evidence = source(relevance=0.99)
+    answer = "The date is supported [S1], but the closing time is not specified."
+    result = evaluate_confidence(answer, [evidence], [evidence])
+
+    assert infer_evidence_state(answer, [evidence], [evidence]) == "partial"
+    assert result.level == "medium"
+    assert result.score <= 74
+    assert result.factors.completeness < 1
+
+
+def test_conflicting_sources_are_low_confidence() -> None:
+    first = source(source_id=1, relevance=0.98)
+    second = source(source_id=2, relevance=0.96)
+    answer = "The documents conflict: one says July 1 [S1], another July 2 [S2]."
+    result = evaluate_confidence(answer, [first, second], [first, second])
+
+    assert infer_evidence_state(answer, [first, second], [first, second]) == "conflicting"
+    assert result.level == "low"
+    assert result.score <= 54
+    assert result.factors.contradiction == 1

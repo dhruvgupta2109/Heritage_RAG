@@ -7,7 +7,11 @@ import {
   Check,
   CheckCheck,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleMinus,
+  Copy,
+  ExternalLink,
   FileText,
   FileUp,
   Library,
@@ -15,6 +19,7 @@ import {
   LockKeyhole,
   Menu,
   MoreHorizontal,
+  Moon,
   PanelLeftClose,
   Pencil,
   Pin,
@@ -24,7 +29,8 @@ import {
   Search,
   Send,
   ShieldCheck,
-  Sparkles,
+  Square,
+  Sun,
   Trash2,
   Upload,
   X,
@@ -35,6 +41,7 @@ import {
   FormEvent,
   KeyboardEvent,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -97,7 +104,7 @@ type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  status?: "retrieving" | "streaming" | "completed" | "error";
+  status?: "retrieving" | "streaming" | "completed" | "stopped" | "error";
   answeredFrom?: AnsweredFrom[];
   sources?: Source[];
   confidence?: Confidence;
@@ -174,6 +181,23 @@ const fallbackRetrievalModes: RetrievalOption[] = [
   },
 ];
 
+const starterPrompts = [
+  {
+    label: "Learning framework",
+    question: "What are the four components of experiential learning?",
+  },
+  {
+    label: "CBSE approach",
+    question:
+      "Compare Heritage's CBSE offering with a typical CBSE school in a table.",
+  },
+  {
+    label: "Project learning",
+    question:
+      "In one concise paragraph, explain why hands-on learning is not always the same as experiential learning.",
+  },
+];
+
 type IndexResult = {
   indexed: string[];
   skipped: string[];
@@ -182,6 +206,7 @@ type IndexResult = {
 };
 
 type UploadStep = "checking" | "locked" | "ready" | "uploading";
+type Theme = "light" | "dark";
 
 type UploadItemStatus =
   | "ready"
@@ -362,18 +387,135 @@ class UploadRequestError extends Error {
   }
 }
 
+async function copyToClipboard(content: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(content);
+      return;
+    } catch {
+      // Fall back to a temporary selection for restricted browser contexts.
+    }
+  }
+  const field = document.createElement("textarea");
+  field.value = content;
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.appendChild(field);
+  field.select();
+  document.execCommand("copy");
+  field.remove();
+}
+
+function UserMessage({
+  message,
+  onEdit,
+  disabled,
+}: {
+  message: Message;
+  onEdit: () => void;
+  disabled: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <div className="user-row">
+      <div className="user-message">{message.content}</div>
+      <div className="message-actions user-actions" aria-label="Query actions">
+        <button
+          type="button"
+          onClick={async () => {
+            await copyToClipboard(message.content);
+            setCopied(true);
+          }}
+          aria-label={copied ? "Query copied" : "Copy query"}
+          title={copied ? "Copied" : "Copy query"}
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+        </button>
+        <button
+          type="button"
+          onClick={onEdit}
+          disabled={disabled}
+          aria-label="Edit and resend query"
+          title="Edit and resend query"
+        >
+          <Pencil size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
   const active = confidenceStates.find(
     (state) => state.level === confidence.level,
   )!;
   const ActiveIcon = active.icon;
+  const popoverId = useId();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const pointerFocusRef = useRef(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleOutsidePointer(event: PointerEvent) {
+      const target = event.target;
+      if (target instanceof Node && !wrapperRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
+    }
+
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointer);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [open]);
 
   return (
-    <div className="confidence-wrap">
+    <div
+      className={`confidence-wrap ${open ? "is-open" : ""}`}
+      ref={wrapperRef}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (next instanceof Node && !event.currentTarget.contains(next)) {
+          setOpen(false);
+        }
+      }}
+    >
       <button
         className={`confidence-badge confidence-${confidence.level}`}
         aria-label={`${confidence.label}, ${confidence.score} out of 100. Show confidence scale.`}
-        aria-describedby={`confidence-${confidence.level}-details`}
+        aria-controls={popoverId}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onPointerDown={() => {
+          pointerFocusRef.current = true;
+        }}
+        onFocus={() => {
+          if (!pointerFocusRef.current) setOpen(true);
+          pointerFocusRef.current = false;
+        }}
+        onClick={() => {
+          pointerFocusRef.current = false;
+          setOpen((current) => !current);
+        }}
+        ref={buttonRef}
         type="button"
       >
         <ActiveIcon size={15} aria-hidden="true" />
@@ -382,8 +524,9 @@ function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
       </button>
       <div
         className="confidence-popover glass-strong"
-        id={`confidence-${confidence.level}-details`}
-        role="tooltip"
+        id={popoverId}
+        role="dialog"
+        aria-label="Answer confidence scale"
       >
         <div className="popover-heading">
           <span>Answer confidence</span>
@@ -424,9 +567,11 @@ function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
 export function AnswerMarkdown({
   content,
   sources,
+  onSourceSelect,
 }: {
   content: string;
   sources: Source[];
+  onSourceSelect?: (source: Source) => void;
 }) {
   const cited = useMemo(
     () => new Map(sources.map((source) => [source.id, source])),
@@ -455,6 +600,18 @@ export function AnswerMarkdown({
             );
           }
           const source = cited.get(Number(match[1]));
+          if (source && onSourceSelect) {
+            return (
+              <button
+                className="citation"
+                type="button"
+                onClick={() => onSourceSelect(source)}
+                aria-label={`Source ${source.id}: ${source.document}, ${pageLabel(source)}`}
+              >
+                {children}
+              </button>
+            );
+          }
           return (
             <a
               className="citation"
@@ -497,9 +654,11 @@ export function AnswerMarkdown({
 function Sources({
   sources,
   answeredFrom,
+  onSourceSelect,
 }: {
   sources: Source[];
   answeredFrom: AnsweredFrom[];
+  onSourceSelect: (source: Source) => void;
 }) {
   return (
     <div className="evidence-block">
@@ -528,13 +687,10 @@ function Sources({
           </summary>
           <div className="source-list">
             {sources.map((source) => (
-              <a
+              <button
                 className="source-row"
-                href={`${API_URL}/api/documents/${source.document_id}/content${
-                  source.page_start ? `#page=${source.page_start}` : ""
-                }`}
-                target="_blank"
-                rel="noreferrer"
+                type="button"
+                onClick={() => onSourceSelect(source)}
                 key={source.chunk_id}
                 aria-label={`Source ${source.id}: ${source.document}, ${pageLabel(source)}`}
               >
@@ -544,7 +700,7 @@ function Sources({
                   <small>{pageLabel(source)}</small>
                   <span>{source.snippet}</span>
                 </span>
-              </a>
+              </button>
             ))}
           </div>
         </details>
@@ -553,57 +709,254 @@ function Sources({
   );
 }
 
-function AssistantMessage({ message }: { message: Message }) {
+function SourceDrawer({
+  source,
+  onClose,
+}: {
+  source: Source;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const [page, setPage] = useState(source.page_start);
+  const sourceUrl = `${API_URL}/api/documents/${source.document_id}/content${
+    page ? `#page=${page}` : ""
+  }`;
+
+  useEffect(() => {
+    setPage(source.page_start);
+    closeButtonRef.current?.focus();
+  }, [source]);
+
+  useEffect(() => {
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
   return (
-    <article className="assistant-message">
-      <div className="assistant-mark" aria-hidden="true">
-        H
-      </div>
-      <div className="assistant-body">
-        {message.status === "retrieving" && (
-          <div className="thinking">
-            <LoaderCircle className="spin" size={16} />
-            Searching your documents
+    <div
+      className="source-drawer-backdrop"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <aside
+        className="source-drawer glass-strong"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        ref={drawerRef}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const focusable = drawerRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), a[href], iframe, [tabindex]:not([tabindex="-1"])',
+          );
+          if (!focusable?.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
+      >
+        <div className="source-drawer-header">
+          <div>
+            <span className="eyebrow">SOURCE {source.id}</span>
+            <h2 id={titleId}>{source.document}</h2>
+            <p>{page ? `Page ${page}` : pageLabel(source)}</p>
           </div>
-        )}
-        <div className="answer-copy">
-          <AnswerMarkdown
-            content={message.content}
-            sources={message.sources ?? []}
-          />
-          {message.status === "streaming" && (
-            <span className="stream-cursor" aria-hidden="true" />
+          <button
+            className="icon-button"
+            type="button"
+            onClick={onClose}
+            ref={closeButtonRef}
+            aria-label="Close source preview"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="source-drawer-actions">
+          {source.page_start !== null && (
+            <div className="page-navigation" aria-label="Source page navigation">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, (current ?? 1) - 1))}
+                disabled={(page ?? 1) <= 1}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>Page {page}</span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => (current ?? 1) + 1)}
+                aria-label="Next page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+          <a href={sourceUrl} target="_blank" rel="noreferrer">
+            Open original
+            <ExternalLink size={14} />
+          </a>
+        </div>
+
+        <div className="source-evidence">
+          <strong>Supporting passage</strong>
+          <p>{source.snippet}</p>
+        </div>
+
+        <iframe
+          className="source-preview"
+          src={sourceUrl}
+          title={`${source.document} source preview`}
+        />
+      </aside>
+    </div>
+  );
+}
+
+function AssistantMessage({
+  message,
+  onRetry,
+  retryDisabled,
+}: {
+  message: Message;
+  onRetry: () => void;
+  retryDisabled: boolean;
+}) {
+  const [selectedSource, setSelectedSource] = useState<Source | null>(null);
+  const [copied, setCopied] = useState(false);
+  const sourceTriggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  function openSource(source: Source) {
+    sourceTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setSelectedSource(source);
+  }
+
+  function closeSource() {
+    setSelectedSource(null);
+    window.setTimeout(() => sourceTriggerRef.current?.focus(), 0);
+  }
+
+  return (
+    <>
+      <article className="assistant-message">
+        <div className="assistant-mark" aria-hidden="true">
+          <img src="/heritage-logo.png" alt="" />
+        </div>
+        <div className="assistant-body">
+          {message.status === "retrieving" && (
+            <div className="thinking">
+              <LoaderCircle className="spin" size={16} />
+              Searching your documents
+            </div>
+          )}
+          <div className="answer-copy">
+            <AnswerMarkdown
+              content={message.content}
+              sources={message.sources ?? []}
+              onSourceSelect={openSource}
+            />
+            {message.status === "streaming" && (
+              <span className="stream-cursor" aria-hidden="true" />
+            )}
+          </div>
+          {message.status === "stopped" && (
+            <p className="stopped-note">
+              <Square size={11} aria-hidden="true" />
+              Stopped — partial answer retained
+            </p>
+          )}
+          {message.error && <p className="message-error">{message.error}</p>}
+          {message.status === "completed" && (
+            <>
+              <Sources
+                sources={message.sources ?? []}
+                answeredFrom={message.answeredFrom ?? []}
+                onSourceSelect={openSource}
+              />
+              {message.confidence && (
+                <div className="confidence-area">
+                  <ConfidenceBadge confidence={message.confidence} />
+                  {(message.confidence.level === "low" ||
+                    message.confidence.level === "very_low") && (
+                    <p className="low-confidence-note">
+                      {message.confidence.rationale}
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {(message.status === "completed" ||
+            message.status === "stopped" ||
+            message.status === "error") && (
+            <div
+              className="message-actions assistant-actions"
+              aria-label="Response actions"
+            >
+              {message.content && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await copyToClipboard(message.content);
+                    setCopied(true);
+                  }}
+                  aria-label={copied ? "Response copied" : "Copy response"}
+                  title={copied ? "Copied" : "Copy response"}
+                >
+                  {copied ? <Check size={13} /> : <Copy size={13} />}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={retryDisabled}
+                aria-label="Retry response"
+                title="Retry response"
+              >
+                <RotateCcw size={13} />
+              </button>
+            </div>
           )}
         </div>
-        {message.error && <p className="message-error">{message.error}</p>}
-        {message.status === "completed" && (
-          <>
-            <Sources
-              sources={message.sources ?? []}
-              answeredFrom={message.answeredFrom ?? []}
-            />
-            {message.confidence && (
-              <div className="confidence-area">
-                <ConfidenceBadge confidence={message.confidence} />
-                {(message.confidence.level === "low" ||
-                  message.confidence.level === "very_low") && (
-                  <p className="low-confidence-note">
-                    {message.confidence.rationale}
-                  </p>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </article>
+      </article>
+      {selectedSource && (
+        <SourceDrawer
+          source={selectedSource}
+          onClose={closeSource}
+        />
+      )}
+    </>
   );
 }
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [theme, setTheme] = useState<Theme>("light");
   const [input, setInput] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -627,6 +980,9 @@ export default function Home() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
+  const answerAbortRef = useRef<AbortController | null>(null);
+  const modalOpen = Boolean(renameChat || deleteChat || uploadOpen);
   const [selectedModel, setSelectedModel] = useState(
     "openai/gpt-oss-120b",
   );
@@ -654,6 +1010,7 @@ export default function Home() {
     setLoadingChat(true);
     setActiveChatId(chat.id);
     setActiveChatTitle(chat.title);
+    setEditingMessageId(null);
     setMobileSidebar(false);
     try {
       const response = await fetch(`${API_URL}/api/chats/${chat.id}`);
@@ -703,6 +1060,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const current =
+      document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+    setTheme(current);
+  }, []);
+
+  useEffect(() => {
     const menuSelector = ".tool-selector[open], .history-actions[open]";
 
     function handleOutsidePointer(event: PointerEvent) {
@@ -748,13 +1111,69 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [renameChat, deleteChat, uploadOpen, chatActionBusy, uploadStep]);
 
+  useEffect(() => {
+    if (!modalOpen) return;
+    const returnFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const dialog = document.querySelector<HTMLElement>(
+      '.modal-card[role="dialog"]',
+    );
+    const focusableSelector =
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
+    function focusFirstControl() {
+      if (
+        dialog &&
+        !dialog.contains(document.activeElement) &&
+        document.activeElement !== dialog
+      ) {
+        dialog.querySelector<HTMLElement>(focusableSelector)?.focus();
+      }
+    }
+
+    function containModalFocus(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Tab" || !dialog) return;
+      const focusable =
+        dialog.querySelectorAll<HTMLElement>(focusableSelector);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    const focusTimer = window.setTimeout(focusFirstControl, 0);
+    document.addEventListener("keydown", containModalFocus);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener("keydown", containModalFocus);
+      window.setTimeout(() => returnFocus?.focus(), 0);
+    };
+  }, [modalOpen]);
+
   function startNewChat() {
     if (isSending) return;
     setActiveChatId(null);
     setActiveChatTitle("New conversation");
     setMessages([]);
     setInput("");
+    setEditingMessageId(null);
     setMobileSidebar(false);
+  }
+
+  function toggleTheme() {
+    const next: Theme = theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    document.documentElement.style.colorScheme = next;
+    localStorage.setItem("heritage-theme", next);
+    setTheme(next);
   }
 
   async function pinChat(chat: ChatSummary) {
@@ -1111,10 +1530,10 @@ export default function Home() {
     }
   }
 
-  async function sendMessage(event?: FormEvent) {
+  async function sendMessage(event?: FormEvent, questionOverride?: string) {
     event?.preventDefault();
-    const question = input.trim();
-    if (!question || isSending) return;
+    const question = (questionOverride ?? input).trim();
+    if (!question || isSending || answerAbortRef.current) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -1134,13 +1553,17 @@ export default function Home() {
       assistantMessage,
     ]);
     setInput("");
+    setEditingMessageId(null);
     setIsSending(true);
     const requestChatId = activeChatId;
+    const controller = new AbortController();
+    answerAbortRef.current = controller;
 
     try {
       const response = await fetch(`${API_URL}/api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           message: question,
           chat_id: requestChatId,
@@ -1221,14 +1644,16 @@ export default function Home() {
       }
       await loadChats();
     } catch (error) {
+      const stopped = controller.signal.aborted;
       setMessages((current) =>
         current.map((message) =>
           message.id === assistantId
             ? {
                 ...message,
-                status: "error",
-                error:
-                  error instanceof Error
+                status: stopped ? "stopped" : "error",
+                error: stopped
+                  ? undefined
+                  : error instanceof Error
                     ? error.message
                     : "Something went wrong.",
               }
@@ -1236,7 +1661,34 @@ export default function Home() {
         ),
       );
     } finally {
+      if (answerAbortRef.current === controller) {
+        answerAbortRef.current = null;
+      }
       setIsSending(false);
+    }
+  }
+
+  function stopAnswer() {
+    answerAbortRef.current?.abort();
+  }
+
+  function editQuery(message: Message) {
+    if (isSending) return;
+    setEditingMessageId(message.id);
+    setInput(message.content);
+    window.setTimeout(() => {
+      composerInputRef.current?.focus();
+      composerInputRef.current?.select();
+    }, 0);
+  }
+
+  function retryResponse(messageIndex: number) {
+    if (isSending) return;
+    const precedingQuery = [...messages.slice(0, messageIndex)]
+      .reverse()
+      .find((message) => message.role === "user");
+    if (precedingQuery) {
+      void sendMessage(undefined, precedingQuery.content);
     }
   }
 
@@ -1500,9 +1952,21 @@ export default function Home() {
             <span className="eyebrow">DOCUMENT ASSISTANT</span>
             <strong>{activeChatTitle}</strong>
           </div>
-          <div className="privacy-chip">
-            <span className={`status-dot ${health ? "online" : ""}`} />
-            {health ? "Local index ready" : "API offline"}
+          <div className="topbar-actions">
+            <button
+              className="theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              aria-pressed={theme === "dark"}
+              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+            >
+              {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
+            <div className="privacy-chip">
+              <span className={`status-dot ${health ? "online" : ""}`} />
+              {health ? "Local index ready" : "API offline"}
+            </div>
           </div>
         </header>
 
@@ -1514,30 +1978,25 @@ export default function Home() {
             </div>
           ) : empty ? (
             <div className="welcome">
-              <div className="welcome-mark">
-                <Sparkles size={24} />
-              </div>
-              <p className="eyebrow">YOUR DOCUMENTS, WITH RECEIPTS</p>
               <h1>Ask what your documents know.</h1>
               <p className="welcome-copy">
                 Heritage answers from your local library, shows the exact page,
                 and tells you how strongly the evidence supports each response.
               </p>
-              <button
-                className="prompt-card glass-strong"
-                type="button"
-                onClick={() =>
-                  setInput(
-                    "What are the four components of experiential learning?",
-                  )
-                }
-              >
-                <span>Try a grounded question</span>
-                <strong>
-                  What are the four components of experiential learning?
-                </strong>
-                <span className="prompt-arrow">↗</span>
-              </button>
+              <div className="prompt-grid" aria-label="Grounded question suggestions">
+                {starterPrompts.map((prompt) => (
+                  <button
+                    className="prompt-card glass-strong"
+                    type="button"
+                    onClick={() => void sendMessage(undefined, prompt.question)}
+                    key={prompt.question}
+                  >
+                    <span>{prompt.label}</span>
+                    <strong>{prompt.question}</strong>
+                    <span className="prompt-arrow">↗</span>
+                  </button>
+                ))}
+              </div>
               {health && health.documents === 0 && (
                 <button
                   className="index-callout"
@@ -1552,13 +2011,21 @@ export default function Home() {
             </div>
           ) : (
             <div className="message-list" aria-live="polite">
-              {messages.map((message) =>
+              {messages.map((message, messageIndex) =>
                 message.role === "user" ? (
-                  <div className="user-row" key={message.id}>
-                    <div className="user-message">{message.content}</div>
-                  </div>
+                  <UserMessage
+                    message={message}
+                    onEdit={() => editQuery(message)}
+                    disabled={isSending}
+                    key={message.id}
+                  />
                 ) : (
-                  <AssistantMessage message={message} key={message.id} />
+                  <AssistantMessage
+                    message={message}
+                    onRetry={() => retryResponse(messageIndex)}
+                    retryDisabled={isSending}
+                    key={message.id}
+                  />
                 ),
               )}
             </div>
@@ -1567,7 +2034,26 @@ export default function Home() {
 
         <div className="composer-zone">
           <form className="composer glass-strong" onSubmit={sendMessage}>
+            {editingMessageId && (
+              <div className="edit-context">
+                <span>
+                  <Pencil size={12} />
+                  Edit and resend query
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingMessageId(null);
+                    setInput("");
+                  }}
+                  aria-label="Cancel editing query"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            )}
             <textarea
+              ref={composerInputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleComposerKeyDown}
@@ -1677,13 +2163,14 @@ export default function Home() {
                 </details>
               </div>
               <button
-                className="send-button"
-                type="submit"
-                disabled={!input.trim() || isSending}
-                aria-label="Send message"
+                className={`send-button ${isSending ? "is-stop" : ""}`}
+                type={isSending ? "button" : "submit"}
+                onClick={isSending ? stopAnswer : undefined}
+                disabled={!isSending && !input.trim()}
+                aria-label={isSending ? "Stop generating answer" : "Send message"}
               >
                 {isSending ? (
-                  <LoaderCircle className="spin" size={18} />
+                  <Square size={14} fill="currentColor" />
                 ) : (
                   <Send size={18} />
                 )}

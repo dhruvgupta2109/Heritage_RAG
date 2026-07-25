@@ -131,11 +131,17 @@ test("historical citation spacing is repaired while rendering", () => {
 });
 
 test("model and retrieval selector menus use an opaque surface", () => {
+  const page = readFileSync(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
   const css = readFileSync(
     new URL("../app/globals.css", import.meta.url),
     "utf8",
   );
 
+  assert.match(page, /12 chunks · query expansion \+ full re-rank/);
+  assert.doesNotMatch(page, /15 chunks · query expansion \+ full re-rank/);
   assert.match(
     css,
     /\.selector-menu\s*\{[^}]*background:\s*#fbfbff;[^}]*backdrop-filter:\s*none;/s,

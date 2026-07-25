@@ -115,7 +115,7 @@ Runtime data and `.env` files must be gitignored.
 |---|---:|---|---|
 | Quick | 3 | Vector rank | No |
 | Medium | 6–8 | Vector + lexical | No |
-| Deep | 12–15 | Vector + BM25 + reciprocal-rank fusion | LLM expansion, then merge |
+| Deep | 12 | Vector + BM25 + reciprocal-rank fusion | LLM expansion, then merge |
 
 Retrieval returns normalized relevance, rank, and provenance. Parameters live in server configuration so they can be calibrated without changing the API.
 

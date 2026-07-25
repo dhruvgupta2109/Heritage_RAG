@@ -43,6 +43,8 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Source folder: `/Users/deepakgupta/Desktop/HERITAGE/DOCS`.
 - Target runtime: loopback-only localhost.
 - Default retrieval mode: Medium.
+- Deep retrieval sends at most 12 re-ranked chunks so Groq requests remain
+  below the current 8,000-token on-demand limit.
 - Answer confidence measures document support, not model certainty.
 - Every provider uses one shared adaptive-formatting contract: concise prose,
   bullets, numbered steps, comparison tables, or short sections according to

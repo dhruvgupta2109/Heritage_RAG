@@ -179,7 +179,7 @@ const fallbackRetrievalModes: RetrievalOption[] = [
   {
     id: "deep",
     label: "Deep",
-    description: "15 chunks · query expansion + full re-rank",
+    description: "12 chunks · query expansion + full re-rank",
   },
 ];
 

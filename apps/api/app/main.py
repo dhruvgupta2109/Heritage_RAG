@@ -237,7 +237,7 @@ async def health(refresh: bool = False) -> dict:
             {
                 "id": "deep",
                 "label": "Deep",
-                "description": "15 chunks · query expansion + full re-rank",
+                "description": "12 chunks · query expansion + full re-rank",
             },
         ],
         "documents": len(indexed_documents),

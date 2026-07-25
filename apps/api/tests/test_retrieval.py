@@ -1,4 +1,4 @@
-from app.retrieval import RetrievalService, _snippet
+from app.retrieval import RETRIEVAL_PROFILES, RetrievalService, _snippet
 
 
 class CapturingVectorStore:
@@ -68,3 +68,4 @@ def test_retrieval_modes_use_different_depths() -> None:
     ]
     assert result.query_count == 3
     assert result.strategy == "full_rerank"
+    assert RETRIEVAL_PROFILES["deep"]["top_k"] == 12

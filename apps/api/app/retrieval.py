@@ -23,7 +23,7 @@ RETRIEVAL_PROFILES = {
     },
     "deep": {
         "candidate_k": 24,
-        "top_k": 15,
+        "top_k": 12,
         "lexical_weight": 0.0,
         "minimum_relevance": 0.24,
         "strategy": "full_rerank",

@@ -90,7 +90,7 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
 |---|---|---|---|---|
 | **Quick** | ~3 | No | No | Fastest |
 | **Medium** | ~6–8 | Basic re-rank | No | Balanced (default) |
-| **Deep** | ~12–15 | Full re-rank | Yes (query decomposed into sub-questions, results merged) | Slowest, most thorough |
+| **Deep** | 12 | Full re-rank | Yes (query decomposed into sub-questions, results merged) | Slowest, most thorough |
 
 ### 5.4 Document Upload (Password Protected)
 - An "Add documents" control (e.g. a small lock/upload icon in the sidebar or header — not in the main chat flow, so it can't be triggered accidentally).

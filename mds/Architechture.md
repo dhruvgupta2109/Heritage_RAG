@@ -1,0 +1,258 @@
+# Heritage RAG — Architecture
+
+> This filename is retained for compatibility. The canonical project architecture is defined here.
+
+**Status:** Proposed
+
+**Target:** Single-user localhost application
+
+**Last updated:** 2026-07-29
+
+## 1. System Context
+
+Heritage RAG is a local document question-answering application. A Next.js client sends a question, model choice, and retrieval mode to a FastAPI backend. The backend retrieves relevant document chunks from Chroma, asks the selected LLM to answer only from that evidence, streams the result, and persists the turn in SQLite.
+
+The system has four durable responsibilities:
+
+1. Ingest files while preserving verifiable source locations.
+2. Retrieve and rank evidence according to the selected speed mode.
+3. Generate a grounded answer with citations and evidence-based confidence.
+4. Preserve conversations, citations, and confidence metadata for later replay.
+
+## 2. High-Level Architecture
+
+```text
+Browser
+  └─ Next.js UI
+      ├─ Chat and streaming answer renderer
+      ├─ Model and speed selectors
+      ├─ Source/page preview
+      ├─ Confidence badge and five-state popover
+      ├─ History sidebar
+      └─ Password-gated upload dialog
+             │ HTTP + SSE (or streaming fetch)
+             ▼
+      FastAPI application
+      ├─ Chat orchestration service
+      ├─ Retrieval and re-ranking service
+      ├─ Citation/grounding service
+      ├─ Confidence evaluator
+      ├─ Ingestion service
+      ├─ Provider adapters
+      └─ History service
+          ├─ Chroma: vectors + chunk provenance
+          ├─ SQLite: chats, messages, documents, jobs
+          ├─ Local documents directory
+          └─ External LLM/embedding APIs when configured
+```
+
+Only the backend can read provider keys, compare the upload password hash, write documents, or access the vector store.
+
+## 3. Proposed Repository Layout
+
+```text
+apps/
+  web/                    # Next.js frontend
+  api/                    # FastAPI backend
+    app/
+      api/                # Route definitions
+      core/               # Configuration, logging, security
+      ingestion/          # Parsers, page metadata, chunking, embedding
+      retrieval/          # Search, query rewriting, re-ranking
+      grounding/          # Citation mapping and confidence evaluation
+      providers/          # Groq first; additional provider adapters later
+      history/            # SQLite persistence
+data/
+  documents/              # Original local source files
+  chroma/                 # Persistent vector index
+  heritage.db             # SQLite database
+mds/                      # Product and engineering documentation
+```
+
+Runtime data and `.env` files must be gitignored.
+
+## 4. Component Responsibilities
+
+### 4.1 Web client
+
+- Own presentation and interaction state, not secrets or trust decisions.
+- Send `message`, `chat_id`, `model`, and `retrieval_mode`.
+- Render streaming text separately from final citations/confidence.
+- Render inline citation markers and an **Answered from** footer.
+- Open a source preview at the cited page where the source format permits.
+- Provide equivalent hover, keyboard-focus, and tap access to the confidence legend.
+- Rehydrate a historical message from stored source and confidence snapshots.
+
+### 4.2 API and chat orchestrator
+
+- Validate model and retrieval mode against server-side allowlists.
+- Load conversation context without allowing prior messages to override grounding rules.
+- Run retrieval, optional query decomposition, and re-ranking.
+- Ask a provider adapter for a structured grounded response.
+- Verify that every emitted citation maps to a retrieved chunk.
+- Calculate confidence from evidence signals and stream the final metadata.
+- Persist the completed turn atomically.
+
+### 4.3 Ingestion service
+
+- Accept PDF, DOCX, TXT, and MD in v1; CSV is optional.
+- Detect duplicate content by checksum and make re-indexing idempotent.
+- Extract text while retaining the reader-facing page number whenever reliable.
+- For formats without stable pages, retain section, heading, paragraph, or line locators and set the page to `null`. Never manufacture a page number.
+- Chunk at roughly 500–800 tokens with overlap without crossing page boundaries unnecessarily.
+- Embed and upsert chunks; retain the original file for source preview.
+
+### 4.4 Retrieval service
+
+| Mode | Initial top-k | Re-ranking | Query rewriting |
+|---|---:|---|---|
+| Quick | 3 | No | No |
+| Medium | 6–8 | Basic | No |
+| Deep | 12–15 | Full | Decompose and merge |
+
+Retrieval returns normalized relevance, rank, and provenance. Parameters live in server configuration so they can be calibrated without changing the API.
+
+### 4.5 Provider adapters
+
+All providers implement the same interface: stream a response from a question, conversation context, retrieved evidence, and grounding instructions. Provider output must be converted to the internal answer schema. The confidence level is calculated by Heritage, not accepted from a provider's self-assessment.
+
+### 4.6 Citation and confidence service
+
+The citation service accepts only retrieved chunk IDs. It rejects or removes a citation that cannot be resolved to stored provenance. Adjacent sources from the same document/page range may be deduplicated for display without losing chunk-level traceability.
+
+The confidence evaluator produces:
+
+- `score`: integer from 0 to 100
+- `level`: `very_high`, `high`, `medium`, `low`, or `very_low`
+- `rationale`: short user-facing explanation
+- `factors`: diagnostic evidence signals for development and testing
+
+Initial score inputs are citation coverage, retrieval/re-ranker strength, agreement between sources, directness of support, and source-location quality. Contradictions, unsupported claims, missing locators, and an explicit no-answer result apply penalties. Hard rules override the numeric result: no supporting source is Very low; partially supported answers cannot exceed Medium.
+
+## 5. Core Data Contracts
+
+### 5.1 Chunk metadata
+
+```json
+{
+  "chunk_id": "chk_...",
+  "document_id": "doc_...",
+  "file_name": "handbook.pdf",
+  "title": "Employee Handbook",
+  "page_start": 12,
+  "page_end": 13,
+  "section": "Leave Policy",
+  "text": "...",
+  "content_hash": "sha256:..."
+}
+```
+
+`page_start` and `page_end` are nullable. Null is displayed as **Page unavailable**, accompanied by the best available text locator.
+
+### 5.2 Final answer payload
+
+```json
+{
+  "message_id": "msg_...",
+  "answer": "Employees receive ... [1]",
+  "answered_from": [
+    {"document": "Employee Handbook", "pages": "12–13"}
+  ],
+  "citations": [
+    {
+      "id": 1,
+      "chunk_id": "chk_...",
+      "document_id": "doc_...",
+      "document": "Employee Handbook",
+      "file_name": "handbook.pdf",
+      "page_start": 12,
+      "page_end": 13,
+      "section": "Leave Policy",
+      "snippet": "..."
+    }
+  ],
+  "confidence": {
+    "score": 92,
+    "level": "very_high",
+    "rationale": "The answer is directly supported by a clearly located passage.",
+    "factors": {
+      "citation_coverage": 1.0,
+      "retrieval_strength": 0.94,
+      "source_agreement": 1.0,
+      "location_quality": 1.0
+    }
+  },
+  "model": "openai/gpt-oss-120b",
+  "retrieval_mode": "medium"
+}
+```
+
+### 5.3 Streaming events
+
+Use Server-Sent Events or a streaming fetch response with typed events:
+
+1. `chat.created` for a first message, including the API-generated title
+2. `message.started`
+3. `retrieval.completed` (optional user-safe progress only)
+4. `answer.delta` repeated for text
+5. `answer.completed` with the authoritative citations, **Answered from** summary, and confidence object
+6. `error`
+
+The UI must not treat a partial stream as a fully cited answer. A stopped or failed stream is labeled incomplete and is not assigned a high confidence state.
+
+## 6. API Surface
+
+| Method | Route | Purpose |
+|---|---|---|
+| `POST` | `/api/chat/stream` | Ask a question and stream the grounded answer |
+| `GET` | `/api/chats` | List chat history |
+| `GET` | `/api/chats/{id}` | Load messages and source/confidence snapshots |
+| `PATCH` | `/api/chats/{id}` | Rename a chat |
+| `DELETE` | `/api/chats/{id}` | Delete a chat after confirmation |
+| `POST` | `/api/uploads/unlock` | Verify upload password and issue a short-lived local session |
+| `POST` | `/api/documents` | Upload and enqueue documents |
+| `GET` | `/api/ingestion-jobs/{id}` | Read indexing status |
+| `POST` | `/api/reindex` | Manually scan the configured documents directory |
+| `GET` | `/api/documents/{id}/content` | Serve a local source for authorized preview |
+| `GET` | `/api/health` | Local health check |
+
+## 7. Persistence
+
+SQLite stores `chats`, `messages`, `documents`, and `ingestion_jobs`. An assistant message stores its final rendered text, model, retrieval mode, citations JSON, confidence JSON, timestamps, and status. Document records store identity, checksum, media type, original path, ingestion state, and timestamps.
+
+Chroma stores embeddings and the chunk metadata needed to resolve a result. SQLite is the record of lifecycle state; Chroma is the retrieval index. Deleting or replacing a document must update both stores in one coordinated operation and report partial failures.
+
+A new chat is created by `POST /api/chat/stream` when `chat_id` is omitted. The
+backend calls Groq once to generate a concise title from the first user query,
+persists that title with the chat, and returns it in `chat.created`. Later turns
+send the existing `chat_id`; title generation is not repeated.
+
+## 8. Security and Privacy
+
+- Bind services to loopback by default.
+- Keep API keys and the upload password hash server-side.
+- Use a password hashing algorithm intended for passwords, such as Argon2id or bcrypt.
+- Return a short-lived, HTTP-only upload-unlock cookie or token after password verification; rate-limit attempts.
+- Validate file type by content and extension, sanitize file names, set file-size limits, and prevent path traversal.
+- Treat document text as untrusted input and delimit it from system instructions to reduce prompt-injection risk.
+- Avoid logging document contents, prompts, provider keys, passwords, or full streamed answers by default.
+- Make external provider use explicit because retrieved text leaves the machine when a cloud model or embedding provider is selected.
+
+## 9. Reliability and Observability
+
+- Ingestion is resumable and records per-file success/failure.
+- A failed upload never makes a partially indexed document appear ready.
+- Chat requests have timeouts and cancellation; provider errors use a common UI-safe error shape.
+- Structured local logs include request ID, chat ID, provider, retrieval mode, latency, chunk IDs, and confidence factors, but not sensitive content.
+- Health checks cover SQLite and Chroma availability; provider availability is reported separately.
+
+## 10. Architecture Decisions and Defaults
+
+- Next.js + Tailwind CSS for the web UI.
+- FastAPI for the backend.
+- Chroma for the local vector store and SQLite for relational persistence.
+- Chroma's local ONNX `all-MiniLM-L6-v2` embedding function for Phase 1; no embedding API or hosted vector database.
+- Server-Sent Events or streaming fetch for one-way answer streaming; WebSockets are unnecessary for v1.
+- Manual folder re-index by default; auto-watch remains an open decision.
+- Groq is the Phase 1 provider through its OpenAI-compatible API. OpenAI, Gemini, Anthropic, and Ollama remain later adapters.
+- Confidence is an application-owned evidence metric, never an LLM claim of truth.

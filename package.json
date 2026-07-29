@@ -1,0 +1,27 @@
+{
+  "name": "heritage-rag",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "uv run --project apps/api uvicorn app.main:app --app-dir apps/api --reload --host 127.0.0.1 --port 8000",
+    "dev:web": "npm run dev --workspace @heritage/web",
+    "build": "npm run build --workspace @heritage/web",
+    "test:api": "uv run --project apps/api pytest apps/api/tests",
+    "index": "uv --directory apps/api run python -m app.cli index"
+  },
+  "dependencies": {
+    "next": "16.2.12"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "overrides": {
+    "sharp": "0.35.3",
+    "next": {
+      "sharp": "0.35.3"
+    }
+  }
+}

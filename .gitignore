@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.next/
+node_modules/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.py[cod]
+data/chroma/
+data/heritage.db
+data/heritage.db-*
+apps/web/.next/
+

@@ -8,10 +8,10 @@ const projectRoot = path.resolve(
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  devIndicators: false,
   turbopack: {
     root: projectRoot,
   },
 };
 
 export default nextConfig;
-

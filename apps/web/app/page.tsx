@@ -9,17 +9,35 @@ import {
   ChevronDown,
   CircleMinus,
   FileText,
+  FileUp,
   Library,
   LoaderCircle,
+  LockKeyhole,
   Menu,
+  MoreHorizontal,
   PanelLeftClose,
+  Pencil,
+  Pin,
+  PinOff,
   Plus,
   Search,
   Send,
+  ShieldCheck,
   Sparkles,
+  Trash2,
+  Upload,
   X,
 } from "lucide-react";
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  DragEvent,
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -41,8 +59,12 @@ type RetrievalMode = "quick" | "medium" | "deep";
 
 type ModelOption = {
   id: string;
+  provider: "groq" | "openai" | "gemini";
+  provider_label: string;
   label: string;
   description: string;
+  available: boolean;
+  status: string;
 };
 
 type RetrievalOption = {
@@ -84,6 +106,7 @@ type Message = {
 type ChatSummary = {
   id: string;
   title: string;
+  pinned: boolean;
   created_at: string;
   updated_at: string;
   message_count: number;
@@ -106,6 +129,13 @@ type ApiHealth = {
   status: string;
   model: string;
   models: ModelOption[];
+  providers: Array<{
+    id: string;
+    label: string;
+    configured: boolean;
+    available: boolean;
+    message: string;
+  }>;
   retrieval_modes: RetrievalOption[];
   documents: number;
   chunks: number;
@@ -115,20 +145,32 @@ type ApiHealth = {
 const fallbackModels: ModelOption[] = [
   {
     id: "openai/gpt-oss-120b",
+    provider: "groq",
+    provider_label: "Groq",
     label: "GPT-OSS 120B",
     description: "Best answer quality",
+    available: true,
+    status: "Ready",
   },
   {
     id: "openai/gpt-oss-20b",
+    provider: "groq",
+    provider_label: "Groq",
     label: "GPT-OSS 20B",
     description: "Fastest responses",
+    available: true,
+    status: "Ready",
   },
 ];
 
 const fallbackRetrievalModes: RetrievalOption[] = [
-  { id: "quick", label: "Quick", description: "3 chunks · fastest" },
-  { id: "medium", label: "Medium", description: "7 chunks · balanced" },
-  { id: "deep", label: "Deep", description: "15 chunks · thorough" },
+  { id: "quick", label: "Quick", description: "3 chunks · vector search" },
+  { id: "medium", label: "Medium", description: "7 chunks · hybrid ranking" },
+  {
+    id: "deep",
+    label: "Deep",
+    description: "15 chunks · query expansion + full re-rank",
+  },
 ];
 
 type IndexResult = {
@@ -137,6 +179,8 @@ type IndexResult = {
   failed: Record<string, string>;
   chunk_count: number;
 };
+
+type UploadStep = "checking" | "locked" | "ready" | "uploading";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
@@ -211,6 +255,28 @@ function relativeTime(value: string) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
+}
+
+function chatSort(left: ChatSummary, right: ChatSummary) {
+  if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+  return (
+    new Date(right.updated_at).getTime() -
+    new Date(left.updated_at).getTime()
+  );
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function responseError(response: Response, fallback: string) {
+  try {
+    const body = await response.json();
+    return typeof body.detail === "string" ? body.detail : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
@@ -451,6 +517,19 @@ export default function Home() {
   const [indexing, setIndexing] = useState(false);
   const [indexResult, setIndexResult] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [renameChat, setRenameChat] = useState<ChatSummary | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [deleteChat, setDeleteChat] = useState<ChatSummary | null>(null);
+  const [chatActionError, setChatActionError] = useState<string | null>(null);
+  const [chatActionBusy, setChatActionBusy] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadStep, setUploadStep] = useState<UploadStep>("checking");
+  const [uploadPassword, setUploadPassword] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [draggingFiles, setDraggingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedModel, setSelectedModel] = useState(
     "openai/gpt-oss-120b",
   );
@@ -464,9 +543,9 @@ export default function Home() {
       const data: ApiHealth = await response.json();
       setHealth(data);
       setSelectedModel((current) =>
-        data.models.some((model) => model.id === current)
+        data.models.some((model) => model.id === current && model.available)
           ? current
-          : data.model,
+          : (data.models.find((model) => model.available)?.id ?? data.model),
       );
     } catch {
       setHealth(null);
@@ -526,6 +605,20 @@ export default function Home() {
     void loadChats(true);
   }, []);
 
+  useEffect(() => {
+    if (!renameChat && !deleteChat && !uploadOpen) return;
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape" || chatActionBusy || uploadStep === "uploading") {
+        return;
+      }
+      setRenameChat(null);
+      setDeleteChat(null);
+      setUploadOpen(false);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [renameChat, deleteChat, uploadOpen, chatActionBusy, uploadStep]);
+
   function startNewChat() {
     if (isSending) return;
     setActiveChatId(null);
@@ -533,6 +626,219 @@ export default function Home() {
     setMessages([]);
     setInput("");
     setMobileSidebar(false);
+  }
+
+  async function pinChat(chat: ChatSummary) {
+    if (chatActionBusy) return;
+    setChatActionBusy(true);
+    setChatActionError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/chats/${chat.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: !chat.pinned }),
+      });
+      if (!response.ok) {
+        throw new Error(await responseError(response, "Could not update conversation."));
+      }
+      const updated: ChatSummary = await response.json();
+      setChats((current) =>
+        current
+          .map((item) => (item.id === updated.id ? updated : item))
+          .sort(chatSort),
+      );
+    } catch (error) {
+      setChatActionError(
+        error instanceof Error ? error.message : "Could not update conversation.",
+      );
+    } finally {
+      setChatActionBusy(false);
+    }
+  }
+
+  function beginRename(chat: ChatSummary) {
+    setChatActionError(null);
+    setRenameChat(chat);
+    setRenameTitle(chat.title);
+  }
+
+  async function submitRename(event: FormEvent) {
+    event.preventDefault();
+    const title = renameTitle.trim();
+    if (!renameChat || !title || chatActionBusy) return;
+    setChatActionBusy(true);
+    setChatActionError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/chats/${renameChat.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!response.ok) {
+        throw new Error(await responseError(response, "Could not rename conversation."));
+      }
+      const updated: ChatSummary = await response.json();
+      setChats((current) =>
+        current
+          .map((item) => (item.id === updated.id ? updated : item))
+          .sort(chatSort),
+      );
+      if (activeChatId === updated.id) setActiveChatTitle(updated.title);
+      setRenameChat(null);
+    } catch (error) {
+      setChatActionError(
+        error instanceof Error ? error.message : "Could not rename conversation.",
+      );
+    } finally {
+      setChatActionBusy(false);
+    }
+  }
+
+  async function confirmDeleteChat() {
+    if (!deleteChat || chatActionBusy || isSending) return;
+    setChatActionBusy(true);
+    setChatActionError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/chats/${deleteChat.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error(await responseError(response, "Could not delete conversation."));
+      }
+      setChats((current) => current.filter((chat) => chat.id !== deleteChat.id));
+      if (activeChatId === deleteChat.id) startNewChat();
+      setDeleteChat(null);
+    } catch (error) {
+      setChatActionError(
+        error instanceof Error ? error.message : "Could not delete conversation.",
+      );
+    } finally {
+      setChatActionBusy(false);
+    }
+  }
+
+  async function openUploadDialog() {
+    setUploadOpen(true);
+    setUploadStep("checking");
+    setUploadError(null);
+    setUploadFeedback(null);
+    setUploadFiles([]);
+    try {
+      const response = await fetch(`${API_URL}/api/uploads/session`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Could not check upload access.");
+      const session: { unlocked: boolean } = await response.json();
+      setUploadStep(session.unlocked ? "ready" : "locked");
+    } catch {
+      setUploadStep("locked");
+      setUploadError("The upload service is unavailable.");
+    }
+  }
+
+  function closeUploadDialog() {
+    if (uploadStep === "uploading") return;
+    setUploadOpen(false);
+    setUploadPassword("");
+    setDraggingFiles(false);
+  }
+
+  async function unlockUploads(event: FormEvent) {
+    event.preventDefault();
+    if (!uploadPassword || uploadStep === "checking") return;
+    setUploadError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/uploads/unlock`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: uploadPassword }),
+      });
+      if (!response.ok) {
+        throw new Error(await responseError(response, "Could not unlock uploads."));
+      }
+      setUploadPassword("");
+      setUploadStep("ready");
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "Could not unlock uploads.",
+      );
+    }
+  }
+
+  function selectUploadFiles(files: FileList | File[]) {
+    const selected = Array.from(files).slice(0, 20);
+    setUploadFiles(selected);
+    setUploadFeedback(null);
+    setUploadError(
+      selected.length < files.length
+        ? "You can upload up to 20 documents at a time."
+        : null,
+    );
+  }
+
+  function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
+    if (event.target.files) selectUploadFiles(event.target.files);
+  }
+
+  function handleFileDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDraggingFiles(false);
+    if (event.dataTransfer.files.length) {
+      selectUploadFiles(event.dataTransfer.files);
+    }
+  }
+
+  async function uploadDocuments() {
+    if (!uploadFiles.length || uploadStep !== "ready") return;
+    setUploadStep("uploading");
+    setUploadError(null);
+    setUploadFeedback(null);
+    const form = new FormData();
+    uploadFiles.forEach((file) => form.append("files", file));
+    try {
+      const response = await fetch(`${API_URL}/api/documents/upload`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!response.ok) {
+        if (response.status === 401) setUploadStep("locked");
+        throw new Error(await responseError(response, "Could not upload documents."));
+      }
+      const result: IndexResult = await response.json();
+      const parts: string[] = [];
+      if (result.indexed.length) {
+        parts.push(
+          `${result.indexed.length} indexed (${result.chunk_count} chunk${
+            result.chunk_count === 1 ? "" : "s"
+          })`,
+        );
+      }
+      if (result.skipped.length) {
+        parts.push(`${result.skipped.length} skipped as duplicate`);
+      }
+      if (Object.keys(result.failed).length) {
+        parts.push(`${Object.keys(result.failed).length} failed`);
+        setUploadError(
+          Object.entries(result.failed)
+            .map(([name, reason]) => `${name}: ${reason}`)
+            .join(" "),
+        );
+      }
+      setUploadFeedback(parts.join(" · ") || "No documents were added.");
+      if (result.indexed.length) {
+        setUploadFiles([]);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        await loadHealth();
+      }
+      setUploadStep("ready");
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "Could not upload documents.",
+      );
+      setUploadStep((current) => (current === "locked" ? "locked" : "ready"));
+    }
   }
 
   async function reindex() {
@@ -766,28 +1072,114 @@ export default function Home() {
                 aria-label="Search conversations"
               />
             </div>
-            <div className="history-label">Recent</div>
             <div className="history-list">
-              {filteredChats.map((chat) => (
-                <button
-                  className={`history-item ${
-                    chat.id === activeChatId ? "is-selected" : ""
-                  }`}
-                  type="button"
-                  key={chat.id}
-                  onClick={() => void openChat(chat)}
-                  disabled={isSending}
-                  aria-pressed={chat.id === activeChatId}
-                >
-                  <span>{chat.title}</span>
-                  <small>{relativeTime(chat.updated_at)}</small>
-                </button>
-              ))}
+              {(
+                [
+                  [
+                    "Pinned",
+                    filteredChats.filter((chat) => chat.pinned),
+                  ],
+                  [
+                    "Recent",
+                    filteredChats.filter((chat) => !chat.pinned),
+                  ],
+                ] as const
+              ).map(
+                ([label, group]) =>
+                  group.length > 0 && (
+                    <div className="history-group" key={label}>
+                      <div className="history-label">{label}</div>
+                      {group.map((chat) => (
+                        <div
+                          className={`history-entry ${
+                            chat.id === activeChatId ? "is-selected" : ""
+                          }`}
+                          key={chat.id}
+                        >
+                          <button
+                            className="history-item"
+                            type="button"
+                            onClick={() => void openChat(chat)}
+                            disabled={isSending}
+                            aria-pressed={chat.id === activeChatId}
+                          >
+                            <span className="history-title">
+                              {chat.pinned && (
+                                <Pin size={11} aria-label="Pinned conversation" />
+                              )}
+                              <span>{chat.title}</span>
+                            </span>
+                            <small>{relativeTime(chat.updated_at)}</small>
+                          </button>
+                          <details className="history-actions">
+                            <summary
+                              aria-label={`Actions for ${chat.title}`}
+                              title="Conversation actions"
+                            >
+                              <MoreHorizontal size={16} />
+                            </summary>
+                            <div className="history-menu glass-strong" role="menu">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={(event) => {
+                                  beginRename(chat);
+                                  const details =
+                                    event.currentTarget.closest("details");
+                                  if (details) details.open = false;
+                                }}
+                              >
+                                <Pencil size={14} />
+                                Rename
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={(event) => {
+                                  void pinChat(chat);
+                                  const details =
+                                    event.currentTarget.closest("details");
+                                  if (details) details.open = false;
+                                }}
+                              >
+                                {chat.pinned ? (
+                                  <PinOff size={14} />
+                                ) : (
+                                  <Pin size={14} />
+                                )}
+                                {chat.pinned ? "Unpin" : "Pin"}
+                              </button>
+                              <button
+                                className="danger-action"
+                                type="button"
+                                role="menuitem"
+                                disabled={isSending}
+                                onClick={(event) => {
+                                  setChatActionError(null);
+                                  setDeleteChat(chat);
+                                  const details =
+                                    event.currentTarget.closest("details");
+                                  if (details) details.open = false;
+                                }}
+                              >
+                                <Trash2 size={14} />
+                                Delete
+                              </button>
+                            </div>
+                          </details>
+                        </div>
+                      ))}
+                    </div>
+                  ),
+              )}
               {chats.length === 0 && (
                 <p className="history-empty">No conversations yet</p>
               )}
               {chats.length > 0 && filteredChats.length === 0 && (
                 <p className="history-empty">No matching conversations</p>
+              )}
+              {chatActionError && !renameChat && !deleteChat && (
+                <p className="history-error">{chatActionError}</p>
               )}
             </div>
           </>
@@ -809,6 +1201,15 @@ export default function Home() {
             </div>
           )}
         </div>
+        <button
+          className="add-documents"
+          type="button"
+          onClick={() => void openUploadDialog()}
+          disabled={indexing}
+        >
+          <LockKeyhole size={16} />
+          {sidebarOpen && <span>Add documents</span>}
+        </button>
         <button
           className="index-button"
           type="button"
@@ -935,23 +1336,29 @@ export default function Home() {
                     className="tool-chip"
                     aria-label={`Model: ${selectedModelOption.label}`}
                   >
-                    <span className="groq-mark">G</span>
+                    <span
+                      className={`provider-mark provider-${selectedModelOption.provider}`}
+                    >
+                      {selectedModelOption.provider_label.slice(0, 1)}
+                    </span>
                     {selectedModelOption.label}
                     <ChevronDown className="tool-chevron" size={13} />
                   </summary>
                   <div className="selector-menu glass-strong" role="menu">
                     <div className="selector-heading">
-                      <span>Groq model</span>
-                      <small>Applies to this message</small>
+                      <span>Answer model</span>
+                      <small>Unavailable providers activate when their key works</small>
                     </div>
                     {modelOptions.map((model) => (
                       <button
                         className={`selector-option ${
                           model.id === selectedModel ? "is-selected" : ""
-                        }`}
+                        } ${model.available ? "" : "is-unavailable"}`}
                         type="button"
                         role="menuitemradio"
                         aria-checked={model.id === selectedModel}
+                        aria-disabled={!model.available}
+                        disabled={!model.available}
                         key={model.id}
                         onClick={(event) => {
                           setSelectedModel(model.id);
@@ -964,7 +1371,10 @@ export default function Home() {
                         </span>
                         <span>
                           <strong>{model.label}</strong>
-                          <small>{model.description}</small>
+                          <small>
+                            {model.provider_label} ·{" "}
+                            {model.available ? model.description : model.status}
+                          </small>
                         </span>
                       </button>
                     ))}
@@ -1039,6 +1449,322 @@ export default function Home() {
           </p>
         </div>
       </section>
+
+      {renameChat && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !chatActionBusy) {
+              setRenameChat(null);
+            }
+          }}
+        >
+          <section
+            className="modal-card compact-modal glass-strong"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rename-chat-title"
+          >
+            <div className="modal-heading">
+              <div>
+                <span className="modal-icon">
+                  <Pencil size={17} />
+                </span>
+                <div>
+                  <h2 id="rename-chat-title">Rename conversation</h2>
+                  <p>Choose a title that will be easy to find later.</p>
+                </div>
+              </div>
+              <button
+                className="icon-button"
+                type="button"
+                onClick={() => setRenameChat(null)}
+                disabled={chatActionBusy}
+                aria-label="Close rename dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={submitRename}>
+              <label className="field-label" htmlFor="rename-chat-input">
+                Conversation title
+              </label>
+              <input
+                className="modal-input"
+                id="rename-chat-input"
+                value={renameTitle}
+                onChange={(event) => setRenameTitle(event.target.value)}
+                maxLength={120}
+                autoFocus
+              />
+              {chatActionError && (
+                <p className="modal-error">{chatActionError}</p>
+              )}
+              <div className="modal-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setRenameChat(null)}
+                  disabled={chatActionBusy}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={!renameTitle.trim() || chatActionBusy}
+                >
+                  {chatActionBusy && <LoaderCircle className="spin" size={15} />}
+                  Save title
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {deleteChat && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !chatActionBusy) {
+              setDeleteChat(null);
+            }
+          }}
+        >
+          <section
+            className="modal-card compact-modal glass-strong"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-chat-title"
+            aria-describedby="delete-chat-description"
+          >
+            <div className="modal-heading">
+              <div>
+                <span className="modal-icon danger-icon">
+                  <Trash2 size={17} />
+                </span>
+                <div>
+                  <h2 id="delete-chat-title">Delete conversation?</h2>
+                  <p id="delete-chat-description">
+                    “{deleteChat.title}” and all its saved messages will be
+                    permanently removed.
+                  </p>
+                </div>
+              </div>
+            </div>
+            {chatActionError && (
+              <p className="modal-error">{chatActionError}</p>
+            )}
+            <div className="modal-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setDeleteChat(null)}
+                disabled={chatActionBusy}
+              >
+                Cancel
+              </button>
+              <button
+                className="danger-button"
+                type="button"
+                onClick={() => void confirmDeleteChat()}
+                disabled={chatActionBusy || isSending}
+                autoFocus
+              >
+                {chatActionBusy && <LoaderCircle className="spin" size={15} />}
+                Delete conversation
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {uploadOpen && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeUploadDialog();
+          }}
+        >
+          <section
+            className="modal-card upload-modal glass-strong"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upload-title"
+          >
+            <div className="modal-heading">
+              <div>
+                <span className="modal-icon">
+                  {uploadStep === "locked" ? (
+                    <LockKeyhole size={18} />
+                  ) : (
+                    <FileUp size={18} />
+                  )}
+                </span>
+                <div>
+                  <h2 id="upload-title">Add documents</h2>
+                  <p>
+                    {uploadStep === "locked"
+                      ? "Unlock this protected action to continue."
+                      : "New files are stored locally and indexed immediately."}
+                  </p>
+                </div>
+              </div>
+              <button
+                className="icon-button"
+                type="button"
+                onClick={closeUploadDialog}
+                disabled={uploadStep === "uploading"}
+                aria-label="Close document upload"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {uploadStep === "checking" && (
+              <div className="upload-checking">
+                <LoaderCircle className="spin" size={20} />
+                Checking upload access
+              </div>
+            )}
+
+            {uploadStep === "locked" && (
+              <form className="unlock-form" onSubmit={unlockUploads}>
+                <label className="field-label" htmlFor="upload-password">
+                  Upload password
+                </label>
+                <div className="password-field">
+                  <LockKeyhole size={16} />
+                  <input
+                    id="upload-password"
+                    type="password"
+                    value={uploadPassword}
+                    onChange={(event) => setUploadPassword(event.target.value)}
+                    placeholder="Enter password"
+                    autoComplete="current-password"
+                    autoFocus
+                  />
+                </div>
+                {uploadError && <p className="modal-error">{uploadError}</p>}
+                <button
+                  className="primary-button full-button"
+                  type="submit"
+                  disabled={!uploadPassword}
+                >
+                  <ShieldCheck size={16} />
+                  Unlock document uploads
+                </button>
+                <p className="security-note">
+                  Access expires after 10 minutes. The password is checked by
+                  your local API and is not stored in the browser.
+                </p>
+              </form>
+            )}
+
+            {(uploadStep === "ready" || uploadStep === "uploading") && (
+              <div className="upload-panel">
+                <div
+                  className={`drop-zone ${draggingFiles ? "is-dragging" : ""}`}
+                  onDragEnter={(event) => {
+                    event.preventDefault();
+                    setDraggingFiles(true);
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragLeave={(event) => {
+                    if (event.currentTarget === event.target) {
+                      setDraggingFiles(false);
+                    }
+                  }}
+                  onDrop={handleFileDrop}
+                >
+                  <Upload size={24} />
+                  <strong>Drop documents here</strong>
+                  <span>PDF, DOCX, TXT, or MD · up to 25 MB each</span>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadStep === "uploading"}
+                  >
+                    Choose files
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt,.md"
+                    multiple
+                    onChange={handleFileInput}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                </div>
+
+                {uploadFiles.length > 0 && (
+                  <div className="selected-files">
+                    <div className="selected-files-heading">
+                      <span>
+                        {uploadFiles.length} document
+                        {uploadFiles.length === 1 ? "" : "s"} selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadFiles([]);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                        disabled={uploadStep === "uploading"}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="selected-file-list">
+                      {uploadFiles.map((file) => (
+                        <div
+                          className="selected-file"
+                          key={`${file.name}-${file.size}-${file.lastModified}`}
+                        >
+                          <FileText size={15} />
+                          <span>{file.name}</span>
+                          <small>{formatFileSize(file.size)}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {uploadFeedback && (
+                  <p className="upload-success">
+                    <Check size={15} />
+                    {uploadFeedback}
+                  </p>
+                )}
+                {uploadError && <p className="modal-error">{uploadError}</p>}
+
+                <button
+                  className="primary-button full-button"
+                  type="button"
+                  onClick={() => void uploadDocuments()}
+                  disabled={
+                    uploadStep === "uploading" || uploadFiles.length === 0
+                  }
+                >
+                  {uploadStep === "uploading" ? (
+                    <LoaderCircle className="spin" size={16} />
+                  ) : (
+                    <FileUp size={16} />
+                  )}
+                  {uploadStep === "uploading"
+                    ? "Uploading and indexing…"
+                    : "Upload and index"}
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </main>
   );
 }

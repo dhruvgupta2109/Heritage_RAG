@@ -1,19 +1,34 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 
 from .chat import ChatService
-from .config import GROQ_MODELS, get_settings
+from .config import get_settings
 from .database import Database
 from .ingestion import IngestionService
+from .providers.gemini import GeminiProvider
 from .providers.groq import GroqProvider
+from .providers.openai import OpenAIProvider
+from .providers.router import ProviderRouter
 from .retrieval import RetrievalService
-from .schemas import ChatDetail, ChatRequest, ChatSummary, DocumentRecord, IndexResult
+from .schemas import (
+    ChatDetail,
+    ChatRequest,
+    ChatSummary,
+    ChatUpdate,
+    DocumentRecord,
+    IndexResult,
+    UploadSessionStatus,
+    UploadUnlockRequest,
+)
+from .upload_auth import InvalidUploadPassword, UploadAccess, UploadRateLimited
+from .uploads import DocumentUploadService
 from .vector_store import VectorStore
 
+UPLOAD_SESSION_COOKIE = "heritage_upload_session"
 settings = get_settings()
 database = Database(settings.sqlite_path)
 vector_store = VectorStore(settings.chroma_path, settings.collection_name)
@@ -24,11 +39,33 @@ retrieval = RetrievalService(
     top_k=settings.retrieval_top_k,
     minimum_relevance=settings.minimum_relevance,
 )
-provider = GroqProvider(
-    api_key=settings.groq_api_key.get_secret_value() if settings.groq_api_key else None,
-    model=settings.groq_model,
+provider = ProviderRouter(
+    groq=GroqProvider(
+        api_key=settings.groq_api_key.get_secret_value() if settings.groq_api_key else None,
+        model=settings.groq_model,
+    ),
+    openai=OpenAIProvider(
+        api_key=(settings.openai_api_key.get_secret_value() if settings.openai_api_key else None),
+    ),
+    gemini=GeminiProvider(
+        api_key=(settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else None),
+    ),
+    default_model=settings.groq_model,
 )
 chat_service = ChatService(retrieval, provider, database)
+upload_access = UploadAccess(
+    password_hash=settings.upload_password_hash.get_secret_value(),
+    session_ttl_seconds=settings.upload_session_ttl_seconds,
+    max_attempts=settings.upload_max_attempts,
+    attempt_window_seconds=settings.upload_attempt_window_seconds,
+)
+document_uploads = DocumentUploadService(
+    docs_dir=settings.docs_dir,
+    database=database,
+    vector_store=vector_store,
+    ingestion=ingestion,
+    max_file_bytes=settings.upload_max_file_bytes,
+)
 
 
 @asynccontextmanager
@@ -56,32 +93,41 @@ app.add_middleware(
 
 
 @app.get("/api/health")
-def health() -> dict:
+async def health(refresh: bool = False) -> dict:
+    providers = await provider.health(refresh=refresh)
+    models = provider.models_with_status()
+    available_models = [model for model in models if model["available"]]
+    default_model = (
+        settings.groq_model
+        if any(model["id"] == settings.groq_model for model in available_models)
+        else (available_models[0]["id"] if available_models else settings.groq_model)
+    )
     return {
         "status": "ok",
-        "provider": "groq",
-        "model": settings.groq_model,
-        "models": GROQ_MODELS,
+        "provider": "multi",
+        "model": default_model,
+        "models": models,
+        "providers": providers,
         "retrieval_modes": [
             {
                 "id": "quick",
                 "label": "Quick",
-                "description": "3 chunks · fastest",
+                "description": "3 chunks · vector search",
             },
             {
                 "id": "medium",
                 "label": "Medium",
-                "description": "7 chunks · balanced",
+                "description": "7 chunks · hybrid ranking",
             },
             {
                 "id": "deep",
                 "label": "Deep",
-                "description": "15 chunks · thorough",
+                "description": "15 chunks · query expansion + full re-rank",
             },
         ],
         "documents": len(database.list_documents()),
         "chunks": vector_store.count,
-        "api_key_configured": bool(settings.groq_api_key),
+        "api_key_configured": any(item["configured"] for item in providers),
     }
 
 
@@ -125,6 +171,77 @@ def chat_detail(chat_id: str) -> dict:
     if not chat:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return chat
+
+
+@app.patch("/api/chats/{chat_id}", response_model=ChatSummary)
+def update_chat(chat_id: str, update: ChatUpdate) -> dict:
+    if update.title is None and update.pinned is None:
+        raise HTTPException(status_code=400, detail="No chat changes supplied")
+    if update.title is not None and not database.rename_chat(chat_id, update.title):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if update.pinned is not None and not database.set_chat_pinned(chat_id, update.pinned):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    chat = database.get_chat(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {key: value for key, value in chat.items() if key != "messages"}
+
+
+@app.delete("/api/chats/{chat_id}", status_code=204)
+def delete_chat(chat_id: str) -> Response:
+    if not database.delete_chat(chat_id):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return Response(status_code=204)
+
+
+@app.post("/api/uploads/unlock", response_model=UploadSessionStatus)
+def unlock_uploads(
+    unlock_request: UploadUnlockRequest,
+    request: Request,
+    response: Response,
+) -> dict:
+    client_key = request.client.host if request.client else "local"
+    try:
+        token = upload_access.unlock(unlock_request.password, client_key)
+    except InvalidUploadPassword as exc:
+        raise HTTPException(status_code=401, detail="The upload password is incorrect.") from exc
+    except UploadRateLimited as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="Upload access is temporarily unavailable. Try again later.",
+        ) from exc
+    response.set_cookie(
+        key=UPLOAD_SESSION_COOKIE,
+        value=token,
+        max_age=settings.upload_session_ttl_seconds,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path="/api",
+    )
+    return {
+        "unlocked": True,
+        "expires_in_seconds": settings.upload_session_ttl_seconds,
+    }
+
+
+@app.get("/api/uploads/session", response_model=UploadSessionStatus)
+def upload_session(request: Request) -> dict:
+    unlocked = upload_access.is_unlocked(request.cookies.get(UPLOAD_SESSION_COOKIE))
+    return {
+        "unlocked": unlocked,
+        "expires_in_seconds": settings.upload_session_ttl_seconds if unlocked else None,
+    }
+
+
+@app.post("/api/documents/upload", response_model=IndexResult)
+async def upload_documents(
+    request: Request,
+    files: list[UploadFile] = File(...),
+) -> IndexResult:
+    if not upload_access.is_unlocked(request.cookies.get(UPLOAD_SESSION_COOKIE)):
+        raise HTTPException(status_code=401, detail="Unlock document uploads first.")
+    return await document_uploads.upload(files)
 
 
 @app.post("/api/chat/stream")

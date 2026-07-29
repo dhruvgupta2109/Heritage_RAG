@@ -10,7 +10,8 @@
     "dev:web": "npm run dev --workspace @heritage/web",
     "build": "npm run build --workspace @heritage/web",
     "test:api": "uv run --project apps/api pytest apps/api/tests",
-    "index": "uv --directory apps/api run python -m app.cli index"
+    "index": "uv --directory apps/api run python -m app.cli index",
+    "eval": "uv --directory apps/api run python -m app.cli evaluate"
   },
   "dependencies": {
     "next": "16.2.12"

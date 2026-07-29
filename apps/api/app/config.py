@@ -5,20 +5,53 @@ from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_UPLOAD_PASSWORD_HASH = "$2b$12$hZAfbzIRTRpil8xgYFEVheOqFk/ba0R7RZ4zlb7iiIdOm6mid1tv6"
 
-GROQ_MODELS = (
+MODEL_CATALOG = (
     {
         "id": "openai/gpt-oss-120b",
+        "provider": "groq",
+        "provider_label": "Groq",
         "label": "GPT-OSS 120B",
         "description": "Best answer quality",
     },
     {
         "id": "openai/gpt-oss-20b",
+        "provider": "groq",
+        "provider_label": "Groq",
         "label": "GPT-OSS 20B",
         "description": "Fastest responses",
     },
+    {
+        "id": "gpt-5.6-terra",
+        "provider": "openai",
+        "provider_label": "OpenAI",
+        "label": "GPT-5.6 Terra",
+        "description": "Balanced intelligence and cost",
+    },
+    {
+        "id": "gpt-5.6-luna",
+        "provider": "openai",
+        "provider_label": "OpenAI",
+        "label": "GPT-5.6 Luna",
+        "description": "Efficient, high-volume answers",
+    },
+    {
+        "id": "gemini-3.6-flash",
+        "provider": "gemini",
+        "provider_label": "Gemini",
+        "label": "Gemini 3.6 Flash",
+        "description": "Strong speed and reasoning",
+    },
+    {
+        "id": "gemini-3.5-flash-lite",
+        "provider": "gemini",
+        "provider_label": "Gemini",
+        "label": "Gemini 3.5 Flash-Lite",
+        "description": "Lowest latency and cost",
+    },
 )
-GROQ_MODEL_IDS = frozenset(model["id"] for model in GROQ_MODELS)
+MODEL_IDS = frozenset(model["id"] for model in MODEL_CATALOG)
 
 
 class Settings(BaseSettings):
@@ -30,6 +63,13 @@ class Settings(BaseSettings):
 
     groq_api_key: SecretStr | None = None
     groq_model: str = "openai/gpt-oss-120b"
+    openai_api_key: SecretStr | None = None
+    gemini_api_key: SecretStr | None = None
+    upload_password_hash: SecretStr = SecretStr(DEFAULT_UPLOAD_PASSWORD_HASH)
+    upload_session_ttl_seconds: int = 600
+    upload_max_attempts: int = 5
+    upload_attempt_window_seconds: int = 600
+    upload_max_file_bytes: int = 25 * 1024 * 1024
     docs_dir: Path = PROJECT_ROOT / "DOCS"
     data_dir: Path = PROJECT_ROOT / "data"
     frontend_origin: str = "http://127.0.0.1:3000"

@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
 CREATE TABLE IF NOT EXISTS chats (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -69,11 +70,24 @@ class Database:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            chat_columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(chats)").fetchall()
+            }
+            if "pinned" not in chat_columns:
+                connection.execute("ALTER TABLE chats ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
 
     def find_document_by_path(self, relative_path: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT * FROM documents WHERE relative_path = ?", (relative_path,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def find_document_by_hash(self, content_hash: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM documents WHERE content_hash = ? AND status = 'ready'",
+                (content_hash,),
             ).fetchone()
         return dict(row) if row else None
 
@@ -131,6 +145,7 @@ class Database:
         return {
             "id": chat_id,
             "title": title,
+            "pinned": False,
             "created_at": created_at,
             "updated_at": created_at,
             "message_count": 0,
@@ -140,7 +155,8 @@ class Database:
         with self.connect() as connection:
             chat = connection.execute(
                 """
-                SELECT chats.id, chats.title, chats.created_at, chats.updated_at,
+                SELECT chats.id, chats.title, chats.pinned,
+                       chats.created_at, chats.updated_at,
                        COUNT(messages.id) AS message_count
                 FROM chats
                 LEFT JOIN messages ON messages.chat_id = chats.id
@@ -163,6 +179,7 @@ class Database:
             ).fetchall()
 
         result = dict(chat)
+        result["pinned"] = bool(result["pinned"])
         result["messages"] = [_message_record(row) for row in messages]
         return result
 
@@ -170,15 +187,37 @@ class Database:
         with self.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT chats.id, chats.title, chats.created_at, chats.updated_at,
+                SELECT chats.id, chats.title, chats.pinned,
+                       chats.created_at, chats.updated_at,
                        COUNT(messages.id) AS message_count
                 FROM chats
                 LEFT JOIN messages ON messages.chat_id = chats.id
                 GROUP BY chats.id
-                ORDER BY chats.updated_at DESC, chats.created_at DESC
+                ORDER BY chats.pinned DESC, chats.updated_at DESC, chats.created_at DESC
                 """
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [{**dict(row), "pinned": bool(row["pinned"])} for row in rows]
+
+    def rename_chat(self, chat_id: str, title: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE chats SET title = ? WHERE id = ?",
+                (title, chat_id),
+            )
+        return cursor.rowcount > 0
+
+    def set_chat_pinned(self, chat_id: str, pinned: bool) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE chats SET pinned = ? WHERE id = ?",
+                (int(pinned), chat_id),
+            )
+        return cursor.rowcount > 0
+
+    def delete_chat(self, chat_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+        return cursor.rowcount > 0
 
     def save_user_message(
         self,

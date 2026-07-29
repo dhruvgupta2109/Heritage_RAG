@@ -1,6 +1,6 @@
 # Heritage RAG — Delivery Phases
 
-**Status:** Phase 0 and Phase 1 complete; Phase 2 and Phase 4 partially started
+**Status:** Phase 0 and Phase 1 complete; Phase 2 implemented pending external-provider credential verification; Phase 3 and Phase 4 substantially implemented
 
 **Last updated:** 2026-07-29
 
@@ -60,7 +60,12 @@ Current progress:
 
 - Complete: selectable Groq models with per-message persistence.
 - Complete: working Quick, Medium, and Deep chunk-depth profiles.
-- Pending: additional provider families, full re-ranking, and Deep query decomposition.
+- Complete: OpenAI and Gemini adapters, provider/model health, and unavailable states.
+- Complete: local full re-ranking and LLM-driven Deep query decomposition.
+- Complete: normalized errors, timeouts, cancellation-safe streaming, and retries.
+- Complete: 25-question corpus evaluation set and retrieval baseline.
+- Pending: live OpenAI/Gemini contract verification once valid keys are supplied.
+- Pending: broader answer/confidence calibration as the corpus grows.
 
 Deliverables:
 
@@ -82,6 +87,16 @@ Exit criteria:
 ## Phase 3 — Password-Gated Uploads
 
 **Goal:** Add and index documents safely without restarting.
+
+Current progress:
+
+- Complete: bcrypt-backed universal upload password (`Password` by default).
+- Complete: 10-minute HTTP-only upload session and rate-limited unlock attempts.
+- Complete: password dialog, multi-file picker, and drag-and-drop panel.
+- Complete: PDF/DOCX/TXT/MD validation, 25 MB limit, safe naming, and path protection.
+- Complete: content-hash duplicate detection and immediate per-file indexing.
+- Complete: success, duplicate, partial-failure feedback and manual folder re-index.
+- Pending: asynchronous per-file stage updates and an explicit retry action.
 
 Deliverables:
 
@@ -110,7 +125,8 @@ Current progress:
 - Complete: SQLite-backed chat/message persistence and list/detail APIs.
 - Complete: Groq title generation from the first user query.
 - Complete: sidebar navigation, new-chat flow, continuation, and historical source/confidence replay.
-- Pending: rename, delete with confirmation, and date-grouped history.
+- Complete: rename, pin/unpin, and delete-with-confirmation controls.
+- Pending: date-grouped history.
 
 Deliverables:
 

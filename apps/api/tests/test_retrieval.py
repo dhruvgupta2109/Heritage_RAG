@@ -52,7 +52,19 @@ def test_retrieval_modes_use_different_depths() -> None:
 
     service.retrieve_with_mode("Question", "quick")
     service.retrieve_with_mode("Question", "medium")
-    service.retrieve_with_mode("Question", "deep")
+    result = service.retrieve_with_mode(
+        "Question",
+        "deep",
+        ["Question details", "Question source"],
+    )
 
-    assert [call["top_k"] for call in vector_store.calls] == [3, 7, 15]
-    assert [call["lexical_weight"] for call in vector_store.calls] == [0.0, 0.18, 0.25]
+    assert [call["top_k"] for call in vector_store.calls] == [3, 7, 24, 24, 24]
+    assert [call["lexical_weight"] for call in vector_store.calls] == [
+        0.0,
+        0.18,
+        0.0,
+        0.0,
+        0.0,
+    ]
+    assert result.query_count == 3
+    assert result.strategy == "full_rerank"

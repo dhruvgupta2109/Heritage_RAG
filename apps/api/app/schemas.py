@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from pydantic.functional_validators import field_validator
 
-from .config import GROQ_MODEL_IDS
+from .config import MODEL_IDS
 
 ConfidenceLevel = Literal["very_high", "high", "medium", "low", "very_low"]
 RetrievalMode = Literal["quick", "medium", "deep"]
@@ -18,8 +18,8 @@ class ChatRequest(BaseModel):
     @field_validator("model")
     @classmethod
     def supported_model(cls, value: str | None) -> str | None:
-        if value is not None and value not in GROQ_MODEL_IDS:
-            raise ValueError("Unsupported Groq model")
+        if value is not None and value not in MODEL_IDS:
+            raise ValueError("Unsupported model")
         return value
 
 
@@ -78,9 +78,25 @@ class AnswerPayload(BaseModel):
 class ChatSummary(BaseModel):
     id: str
     title: str
+    pinned: bool = False
     created_at: str
     updated_at: str
     message_count: int
+
+
+class ChatUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    pinned: bool | None = None
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = " ".join(value.split())
+        if not cleaned:
+            raise ValueError("Title cannot be empty")
+        return cleaned
 
 
 class ChatMessage(BaseModel):
@@ -116,3 +132,12 @@ class IndexResult(BaseModel):
     skipped: list[str]
     failed: dict[str, str]
     chunk_count: int
+
+
+class UploadUnlockRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+
+
+class UploadSessionStatus(BaseModel):
+    unlocked: bool
+    expires_in_seconds: int | None = None

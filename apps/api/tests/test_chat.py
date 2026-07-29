@@ -15,7 +15,12 @@ class FakeRetrieval:
         self.result = result
         self.mode = None
 
-    def retrieve_with_mode(self, _: str, mode: str) -> RetrievalResult:
+    def retrieve_with_mode(
+        self,
+        _: str,
+        mode: str,
+        expanded_queries: list[str] | None = None,
+    ) -> RetrievalResult:
         self.mode = mode
         return self.result
 
@@ -36,6 +41,9 @@ class FakeProvider:
     async def generate_title(self, query: str, _: str) -> str:
         self.title_queries.append(query)
         return "Experiential Learning Components"
+
+    async def expand_queries(self, _: str, __: str) -> list[str]:
+        return ["experiential learning stages"]
 
 
 def source() -> SourceRecord:
@@ -145,7 +153,7 @@ async def test_uncited_provider_answer_becomes_no_support(tmp_path: Path) -> Non
 
 def test_chat_request_rejects_an_unknown_model() -> None:
     with pytest.raises(ValidationError):
-        ChatRequest(message="Question", model="not-a-groq-model")
+        ChatRequest(message="Question", model="not-a-supported-model")
 
 
 @pytest.mark.asyncio

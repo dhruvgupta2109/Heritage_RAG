@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "description": "Grounded retrieval evaluation set derived from the PDFs in DOCS.",
+  "cases": [
+    {
+      "id": "experiential-components",
+      "category": "direct",
+      "question": "What are the four components of experiential learning?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Experiential Learning at HXLS Noida | Learning by Doing.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["Experience", "Reflection", "Dialogue", "Understanding"]
+    },
+    {
+      "id": "experiential-definition",
+      "category": "direct",
+      "question": "How does the document define experiential learning?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Experiential Learning at HXLS Noida | Learning by Doing.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["learning by doing", "reflection"]
+    },
+    {
+      "id": "experiential-versus-education",
+      "category": "comparison",
+      "question": "How is experiential learning different from experiential education?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Experiential Learning at HXLS Noida | Learning by Doing.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["individual learning process", "broader philosophy"]
+    },
+    {
+      "id": "kolb-influences",
+      "category": "direct",
+      "question": "Who helped develop the modern theory of experiential learning, and whose work influenced it?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Experiential Learning at HXLS Noida | Learning by Doing.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["David A. Kolb", "John Dewey", "Kurt Lewin", "Jean Piaget"]
+    },
+    {
+      "id": "hands-on-reflection",
+      "category": "reasoning",
+      "question": "Why is hands-on learning not always the same as experiential learning?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Experiential Learning at HXLS Noida | Learning by Doing.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["reflection", "knowledge"]
+    },
+    {
+      "id": "experiential-skills",
+      "category": "direct",
+      "question": "Which skills does learning by doing help develop at HXLS?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Experiential Learning at HXLS Noida | Learning by Doing.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["critical thinking", "problem solving", "decision-making"]
+    },
+    {
+      "id": "pbl-start",
+      "category": "direct",
+      "question": "How does an interdisciplinary project or expedition begin?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Interdisciplinary Project-Based Learning | HXLS Noida Approach.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["real-life problem", "issue"]
+    },
+    {
+      "id": "pbl-process",
+      "category": "multi-step",
+      "question": "What do students do during an interdisciplinary project before testing a solution?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Interdisciplinary Project-Based Learning | HXLS Noida Approach.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["research", "analyse", "experts", "collaborate", "brainstorm"]
+    },
+    {
+      "id": "pbl-outcomes",
+      "category": "direct",
+      "question": "What habits and academic skills are developed through in-depth project investigation?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "Interdisciplinary Project-Based Learning | HXLS Noida Approach.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["critical thinking", "inquiry", "team-work", "numeracy", "literacy"]
+    },
+    {
+      "id": "calendar-new-session",
+      "category": "date",
+      "question": "When does the new session begin for KG to Grade 8 and for Pre Nursery and Nursery?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["April 2", "April 3"]
+    },
+    {
+      "id": "calendar-summer-vacation",
+      "category": "date",
+      "question": "On what date does summer vacation begin for all students?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [1]
+        }
+      ],
+      "expected_answer_terms": ["May 21"]
+    },
+    {
+      "id": "calendar-july-reopen",
+      "category": "date",
+      "question": "When does school reopen for all after the summer break?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [2]
+        }
+      ],
+      "expected_answer_terms": ["July 1"]
+    },
+    {
+      "id": "calendar-july-block-tests",
+      "category": "date-list",
+      "question": "Which July dates have Block Tests for Grade 8?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [2]
+        }
+      ],
+      "expected_answer_terms": ["July 8", "July 9", "July 10", "July 11", "July 12", "July 15", "July 16"]
+    },
+    {
+      "id": "calendar-lit-pret",
+      "category": "date",
+      "question": "When is the Lit Pret inter-school literary event?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [2]
+        }
+      ],
+      "expected_answer_terms": ["July 25", "July 26"]
+    },
+    {
+      "id": "calendar-september-exams",
+      "category": "date-list",
+      "question": "Which September dates have the Grade 8 half-yearly examination?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [3]
+        }
+      ],
+      "expected_answer_terms": ["September 9", "September 11", "September 13", "September 18", "September 20", "September 23", "September 25"]
+    },
+    {
+      "id": "calendar-diwali-break",
+      "category": "date-range",
+      "question": "When is the Diwali break for all, and when does school reopen?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [4]
+        }
+      ],
+      "expected_answer_terms": ["October 30", "November 4"]
+    },
+    {
+      "id": "calendar-winter-break",
+      "category": "date-range",
+      "question": "When does winter break commence, and when does school reopen for all students?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [6]
+        }
+      ],
+      "expected_answer_terms": ["December 31", "January 15"]
+    },
+    {
+      "id": "calendar-grade-eight-finals",
+      "category": "date-list",
+      "question": "List the February and March dates for the Grade 8 final examination.",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [7]
+        }
+      ],
+      "expected_answer_terms": ["February 21", "February 25", "February 28", "March 3", "March 5", "March 7", "March 10"]
+    },
+    {
+      "id": "expedition-constitution",
+      "category": "table",
+      "question": "What excursion is connected to the Grade 8 Indian Constitution and Secularism expedition?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [8]
+        }
+      ],
+      "expected_answer_terms": ["Parliament of India"]
+    },
+    {
+      "id": "expedition-qutub-minar",
+      "category": "table",
+      "question": "Which grade and expedition visit Qutub Minar in January 2025?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [8]
+        }
+      ],
+      "expected_answer_terms": ["Grade VII", "Our Heritage"]
+    },
+    {
+      "id": "expedition-healthy-plate",
+      "category": "table",
+      "question": "Where does Grade 2 go for the My Healthy Plate expedition?",
+      "answerable": true,
+      "expected_sources": [
+        {
+          "file_name": "bny-wcp-2409121418-1699359286-1-1.pdf",
+          "pages": [8]
+        }
+      ],
+      "expected_answer_terms": ["Organic Farm"]
+    },
+    {
+      "id": "unsupported-school-timings",
+      "category": "no-answer",
+      "question": "What are the daily school opening and closing times?",
+      "answerable": false,
+      "expected_sources": [],
+      "expected_answer_terms": []
+    },
+    {
+      "id": "unsupported-fees",
+      "category": "no-answer",
+      "question": "What is the annual tuition fee for Grade 8?",
+      "answerable": false,
+      "expected_sources": [],
+      "expected_answer_terms": []
+    },
+    {
+      "id": "unsupported-principal",
+      "category": "no-answer",
+      "question": "What is the full name of the school principal?",
+      "answerable": false,
+      "expected_sources": [],
+      "expected_answer_terms": []
+    },
+    {
+      "id": "unsupported-bus-routes",
+      "category": "no-answer",
+      "question": "Which bus routes serve Sector 62?",
+      "answerable": false,
+      "expected_sources": [],
+      "expected_answer_terms": []
+    }
+  ]
+}

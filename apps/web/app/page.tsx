@@ -1026,10 +1026,14 @@ export default function Home() {
         }`}
       >
         <div className="brand-row">
-          <div className="brand">
-            <span className="brand-mark">H</span>
-            {sidebarOpen && <span>HERITAGE</span>}
-          </div>
+          {sidebarOpen && (
+            <div className="brand">
+              <span className="brand-mark" aria-hidden="true">
+                <img src="/heritage-logo.png" alt="" />
+              </span>
+              <span>HERITAGE</span>
+            </div>
+          )}
           <button
             className="icon-button desktop-only"
             onClick={() => setSidebarOpen((value) => !value)}

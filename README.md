@@ -18,7 +18,7 @@ If information is not supported by indexed documents, Heritage says so, shows **
 
 - Next.js 16 + React 19 + Tailwind CSS
 - FastAPI
-- Groq Chat Completions API
+- Groq Chat Completions, OpenAI Responses, and Gemini Generate Content adapters
 - Chroma with free local `all-MiniLM-L6-v2` ONNX embeddings
 - SQLite for document lifecycle and answer snapshots
 
@@ -30,7 +30,11 @@ Prerequisites: Node.js 20.9 or newer, Python 3.11, and `uv`.
 
 1. Keep source files in `DOCS/`.
 2. If `.env` does not exist, copy `.env.example` to `.env`.
-3. Set `GROQ_API_KEY` in `.env`. Never commit that file.
+3. Set `GROQ_API_KEY` in `.env`. Optionally set `OPENAI_API_KEY` and
+   `GEMINI_API_KEY`; models stay visible but disabled until their provider
+   authenticates. The local document-upload password defaults to `Password`;
+   override `UPLOAD_PASSWORD_HASH` with a bcrypt hash before using the app in a
+   less trusted environment. Never commit `.env`.
 4. Install dependencies:
 
    ```bash
@@ -57,6 +61,7 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000). The API runs on `http://127
 ```bash
 npm run test:api
 npm run build
+npm run eval -- --mode medium
 ```
 
 The Phase 1 corpus test asks `What are the four components of experiential learning?` and expects `Experiential Learning at HXLS Noida | Learning by Doing.pdf`, Page 1. The verified answer identifies Experience, Reflection, Dialogue, and Understanding.
@@ -70,15 +75,27 @@ Implemented:
 - Idempotent local ingestion with checksums.
 - Local Chroma vector search and a basic lexical re-rank.
 - Groq token streaming.
-- Per-message Groq model selection: GPT-OSS 120B or GPT-OSS 20B.
-- Working Quick, Medium, and Deep retrieval-depth profiles.
+- Per-message provider/model selection across Groq, OpenAI, and Gemini.
+- Provider availability checks that disable missing, invalid, or inaccessible models.
+- Working Quick vector search, Medium hybrid ranking, and Deep LLM query expansion
+  with local BM25/vector fusion and full re-ranking.
+- Normalized provider errors, timeouts, cancellation-safe streaming, and one retry
+  for transient failures.
 - Persistent SQLite chat history with sidebar loading and continuation.
 - Groq-generated conversation titles based on each chat's first user question.
+- Persistent rename, pin/unpin, and confirmed chat deletion controls.
+- Password-gated multi-document upload with a short-lived HTTP-only session,
+  rate limiting, safe file validation, duplicate detection, and immediate
+  indexing.
+- Manual folder re-indexing for documents copied directly into `DOCS/`.
 - Citation validation, source/page links, query-aware snippets, and **Answered from**.
 - Evidence confidence calculation and all five glass UI states.
 - Explicit no-evidence behavior with Very low confidence.
 
-Chat rename/delete, upload authentication, additional provider families, full re-ranking, and Deep query decomposition are later work.
+The current corpus includes a 25-question evaluation set covering expected
+document/page retrieval and explicit no-answer cases. Per-file asynchronous
+upload progress/retry, date-grouped history, optional Anthropic/Ollama adapters,
+and broader confidence calibration are later work.
 
 ## Current Limitations
 

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from .confidence import evaluate_confidence, sanitize_answer
 from .database import Database
-from .providers.groq import GroqProvider
+from .providers.base import AnswerProvider
 from .retrieval import RetrievalService
 from .schemas import AnsweredFrom, AnswerPayload, ChatRequest, SourceRecord
 
@@ -17,7 +17,7 @@ class ChatService:
     def __init__(
         self,
         retrieval: RetrievalService,
-        provider: GroqProvider,
+        provider: AnswerProvider,
         database: Database,
     ):
         self.retrieval = retrieval
@@ -66,15 +66,28 @@ class ChatService:
             },
         )
 
+        expanded_queries: list[str] = []
+        if request.retrieval_mode == "deep":
+            try:
+                expanded_queries = await self.provider.expand_queries(
+                    request.message,
+                    selected_model,
+                )
+            except Exception:
+                expanded_queries = []
+
         result = self.retrieval.retrieve_with_mode(
             request.message,
             request.retrieval_mode,
+            expanded_queries,
         )
         yield _sse(
             "retrieval.completed",
             {
                 "source_count": len(result.sources),
                 "documents": sorted({source.document for source in result.sources}),
+                "query_count": result.query_count,
+                "strategy": result.strategy,
             },
         )
 

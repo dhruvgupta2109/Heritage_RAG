@@ -84,7 +84,7 @@ If `backdrop-filter` is unavailable or reduced transparency is enabled, use the 
 
 - Product mark/name at the top, followed by **New chat**.
 - Search/filter and chronological conversation groups.
-- Rename and delete appear in an overflow menu; deletion requires confirmation.
+- Rename, pin/unpin, and delete appear in an overflow menu; deletion requires confirmation.
 - **Add documents** remains visually separate near the bottom and uses a lock/upload icon.
 - Collapse state and selected conversation are visually clear.
 
@@ -185,6 +185,8 @@ Password errors are generic. Unsupported file type and size errors are specific 
 - Preserve partial answer text if canceled, label it **Stopped**, and do not show a completed confidence rating.
 - Empty Sources means a controlled no-answer state, not an empty expandable panel.
 - Provider, network, parsing, and indexing errors have human-readable recovery actions.
+- The model menu shows provider identity. A model whose key is missing, invalid,
+  or lacks access remains visible but disabled with a user-safe status message.
 - Toasts are reserved for brief confirmations; durable problems stay near the affected content.
 
 ## 8. Accessibility

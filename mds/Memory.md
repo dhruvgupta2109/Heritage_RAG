@@ -4,9 +4,12 @@ This file is the concise handoff record for future work. Update it whenever a de
 
 **Last updated:** 2026-07-29
 
-**Current phase:** Phase 1 complete; Phase 2 and Phase 4 slices started
+**Current phase:** Phase 1 complete; Phase 2 implementation complete pending valid OpenAI/Gemini credentials; Phase 3 and Phase 4 substantially implemented
 
-**Implementation status:** Runnable local MVP with Groq generation, local embeddings, Chroma retrieval, citations, page provenance, confidence, persistent chat history, and a connected glass chat UI.
+**Implementation status:** Runnable local multi-provider RAG app with Groq
+generation, dormant OpenAI/Gemini adapters, local hybrid/full re-ranking, Deep
+query decomposition, citations, confidence, evaluation data, password-gated
+document uploads, persistent chat actions, and a connected glass chat UI.
 
 ## Current Product Definition
 
@@ -18,7 +21,7 @@ Heritage RAG is a single-user, localhost document assistant with:
 - A glass confidence badge whose hover/focus/tap popover explains all five states and highlights the active state.
 - Per-message model choice and Quick, Medium, or Deep retrieval.
 - Password-gated uploads and manual folder re-indexing.
-- Local chat history with rename/delete.
+- Local chat history with rename, pin/unpin, and confirmed deletion.
 - A minimalist glass UI with light/dark themes and WCAG 2.2 AA behavior.
 
 ## Confirmed Decisions
@@ -36,6 +39,9 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Page numbers must come from reliable extraction metadata. If unavailable, show **Page unavailable** and a section/paragraph/line locator; never fabricate a page.
 - Answer text, citations, **Answered from**, and confidence snapshots are stored together so history is reproducible.
 - Manual folder re-indexing is the initial default.
+- Document upload uses the shared local password `Password`, stored as a bcrypt
+  hash, with a 10-minute HTTP-only session and five-attempt rate limit.
+- Uploaded files are limited to 25 MB each and PDF, DOCX, TXT, or MD.
 - OCR is not required for the current corpus.
 
 ## Phase 1 Completed
@@ -47,7 +53,13 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Added persistent Chroma search with local embeddings and basic lexical re-ranking.
 - Added a Groq provider adapter with provider-safe error handling.
 - Added per-message selection between GPT-OSS 120B and GPT-OSS 20B.
-- Added functional Quick, Medium, and Deep retrieval profiles; full re-ranking and Deep query decomposition remain pending.
+- Added functional Quick, Medium, and Deep retrieval profiles.
+- Added OpenAI Responses API and Gemini Generate Content adapters. Their models
+  remain disabled until the corresponding key authenticates and grants model access.
+- Added provider health/model-access checks, normalized safe errors, timeouts,
+  cancellation-safe streaming, and transient retries.
+- Upgraded Deep retrieval to LLM query expansion plus local vector/BM25/RRF
+  re-ranking; no hosted reranker or vector database is required.
 - Added Markdown rendering for paragraphs, numbered lists, emphasis, and clickable citations.
 - Added citation validation and normalization, including decorative bracket variants returned by providers.
 - Added query-aware evidence snippets and page-opening source links.
@@ -55,7 +67,16 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Added SQLite schemas and persisted answer/citation/confidence snapshots.
 - Added persistent chat list/detail APIs, sidebar navigation, new-chat behavior, and full historical answer rehydration.
 - Added Groq-generated titles from the first user query with a safe fallback when the provider is unavailable.
-- Added 17 passing backend tests and a successful production frontend build.
+- Added a 25-question corpus evaluation set covering direct, comparison,
+  multi-step, calendar/table, and no-answer cases.
+- Medium and Deep retrieval locate the expected document/page for all 21
+  answerable evaluation cases; Quick locates 18/21 by design.
+- Added persistent chat rename, pin/unpin, and confirmed deletion with automatic
+  migration of existing SQLite data.
+- Added password-gated multi-document upload, secure session/rate limiting,
+  content and size validation, safe naming, duplicate detection, and immediate indexing.
+- Hid the Next.js development indicator from the app preview.
+- Added 31 passing backend tests and a successful production frontend build.
 - Verified the known answer: Experience, Reflection, Dialogue, and Understanding from `Experiential Learning at HXLS Noida | Learning by Doing.pdf`, Page 1, with High confidence.
 - Verified an unrelated query returns no source and Very low confidence.
 
@@ -71,21 +92,22 @@ Heritage RAG is a single-user, localhost document assistant with:
 ## Open Product Decisions
 
 - Approximate number and total size of source documents.
-- Which additional providers should be added in Phase 2.
+- Whether Anthropic or Ollama should be added after OpenAI/Gemini credentials work.
 - Whether folder auto-watch is worth adding after manual re-index.
 - Whether DOCX should be converted/rendered to create stable page locations or use structural locators only.
-- Maximum upload size and allowed CSV behavior.
+- Whether CSV should be supported in addition to the current 25 MB
+  PDF/DOCX/TXT/MD upload contract.
 
 These decisions should be captured in the PRD, Architecture, and this file when resolved.
 
 ## Next Recommended Work
 
-Review the running Phase 1 experience locally, then either calibrate confidence against a larger document set or begin Phase 2:
+Review the connected upload and history controls locally, then:
 
-1. Add representative documents and expected-answer/no-answer questions.
-2. Measure retrieval quality and tune the minimum relevance and confidence weights.
-3. Add full re-ranking and Deep query decomposition behind the existing depth selector.
-4. Add another provider family when its key or local runtime is available.
+1. Add asynchronous per-file upload stage updates and explicit retry.
+2. Add date grouping to long chat histories.
+3. Replace the invalid OpenAI/Gemini credentials and run provider contract checks.
+4. Expand and calibrate the evaluation set as more documents are added.
 
 ## Known Risks
 
@@ -107,3 +129,6 @@ Review the running Phase 1 experience locally, then either calibrate confidence 
 - Implemented and verified the Phase 0 foundation and Phase 1 grounded RAG MVP.
 - Fixed answer Markdown rendering and connected the model/retrieval menus to per-message backend behavior.
 - Connected persistent chat history and API-generated conversation titles end to end.
+- Implemented the Phase 2 provider adapters, availability-aware model menu,
+  Deep query expansion, local full re-ranking, and corpus evaluation set.
+- Added protected multi-document upload and persistent rename/pin/delete chat actions.

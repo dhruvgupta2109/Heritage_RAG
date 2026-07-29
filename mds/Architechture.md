@@ -38,7 +38,7 @@ Browser
       ├─ Citation/grounding service
       ├─ Confidence evaluator
       ├─ Ingestion service
-      ├─ Provider adapters
+      ├─ Provider router and adapters
       └─ History service
           ├─ Chroma: vectors + chunk provenance
           ├─ SQLite: chats, messages, documents, jobs
@@ -60,7 +60,7 @@ apps/
       ingestion/          # Parsers, page metadata, chunking, embedding
       retrieval/          # Search, query rewriting, re-ranking
       grounding/          # Citation mapping and confidence evaluation
-      providers/          # Groq first; additional provider adapters later
+      providers/          # Groq, OpenAI Responses, Gemini Generate Content
       history/            # SQLite persistence
 data/
   documents/              # Original local source files
@@ -106,15 +106,20 @@ Runtime data and `.env` files must be gitignored.
 
 | Mode | Initial top-k | Re-ranking | Query rewriting |
 |---|---:|---|---|
-| Quick | 3 | No | No |
-| Medium | 6–8 | Basic | No |
-| Deep | 12–15 | Full | Decompose and merge |
+| Quick | 3 | Vector rank | No |
+| Medium | 6–8 | Vector + lexical | No |
+| Deep | 12–15 | Vector + BM25 + reciprocal-rank fusion | LLM expansion, then merge |
 
 Retrieval returns normalized relevance, rank, and provenance. Parameters live in server configuration so they can be calibrated without changing the API.
 
 ### 4.5 Provider adapters
 
-All providers implement the same interface: stream a response from a question, conversation context, retrieved evidence, and grounding instructions. Provider output must be converted to the internal answer schema. The confidence level is calculated by Heritage, not accepted from a provider's self-assessment.
+All providers implement the same interface: stream a response, generate a chat
+title, expand a Deep retrieval query, and report key/model availability. Groq
+uses Chat Completions, OpenAI uses the Responses API, and Gemini uses Generate
+Content streaming. Provider output is converted to the same internal answer
+schema. The confidence level is calculated by Heritage, not accepted from a
+provider's self-assessment.
 
 ### 4.6 Citation and confidence service
 
@@ -207,18 +212,23 @@ The UI must not treat a partial stream as a fully cited answer. A stopped or fai
 | `POST` | `/api/chat/stream` | Ask a question and stream the grounded answer |
 | `GET` | `/api/chats` | List chat history |
 | `GET` | `/api/chats/{id}` | Load messages and source/confidence snapshots |
-| `PATCH` | `/api/chats/{id}` | Rename a chat |
+| `PATCH` | `/api/chats/{id}` | Rename or pin/unpin a chat |
 | `DELETE` | `/api/chats/{id}` | Delete a chat after confirmation |
 | `POST` | `/api/uploads/unlock` | Verify upload password and issue a short-lived local session |
-| `POST` | `/api/documents` | Upload and enqueue documents |
+| `GET` | `/api/uploads/session` | Check whether the short-lived upload session is active |
+| `POST` | `/api/documents/upload` | Validate, store, and immediately index uploaded documents |
 | `GET` | `/api/ingestion-jobs/{id}` | Read indexing status |
-| `POST` | `/api/reindex` | Manually scan the configured documents directory |
+| `POST` | `/api/documents/reindex` | Manually scan the configured documents directory |
 | `GET` | `/api/documents/{id}/content` | Serve a local source for authorized preview |
 | `GET` | `/api/health` | Local health check |
 
 ## 7. Persistence
 
-SQLite stores `chats`, `messages`, `documents`, and `ingestion_jobs`. An assistant message stores its final rendered text, model, retrieval mode, citations JSON, confidence JSON, timestamps, and status. Document records store identity, checksum, media type, original path, ingestion state, and timestamps.
+SQLite stores `chats`, `messages`, `documents`, and `ingestion_jobs`. Chat records
+also persist their editable title and pinned state. An assistant message stores
+its final rendered text, model, retrieval mode, citations JSON, confidence JSON,
+timestamps, and status. Document records store identity, checksum, media type,
+original path, ingestion state, and timestamps.
 
 Chroma stores embeddings and the chunk metadata needed to resolve a result. SQLite is the record of lifecycle state; Chroma is the retrieval index. Deleting or replacing a document must update both stores in one coordinated operation and report partial failures.
 
@@ -233,6 +243,8 @@ send the existing `chat_id`; title generation is not repeated.
 - Keep API keys and the upload password hash server-side.
 - Use a password hashing algorithm intended for passwords, such as Argon2id or bcrypt.
 - Return a short-lived, HTTP-only upload-unlock cookie or token after password verification; rate-limit attempts.
+- The local default password is `Password`, represented only by a configurable
+  bcrypt hash. The upload session expires after 10 minutes.
 - Validate file type by content and extension, sanitize file names, set file-size limits, and prevent path traversal.
 - Treat document text as untrusted input and delimit it from system instructions to reduce prompt-injection risk.
 - Avoid logging document contents, prompts, provider keys, passwords, or full streamed answers by default.
@@ -245,6 +257,9 @@ send the existing `chat_id`; title generation is not repeated.
 - Chat requests have timeouts and cancellation; provider errors use a common UI-safe error shape.
 - Structured local logs include request ID, chat ID, provider, retrieval mode, latency, chunk IDs, and confidence factors, but not sensitive content.
 - Health checks cover SQLite and Chroma availability; provider availability is reported separately.
+- Provider health checks verify both key authentication and whether each
+  configured model appears in that key's model catalog. Unavailable models are
+  visible but disabled in the client.
 
 ## 10. Architecture Decisions and Defaults
 
@@ -254,5 +269,6 @@ send the existing `chat_id`; title generation is not repeated.
 - Chroma's local ONNX `all-MiniLM-L6-v2` embedding function for Phase 1; no embedding API or hosted vector database.
 - Server-Sent Events or streaming fetch for one-way answer streaming; WebSockets are unnecessary for v1.
 - Manual folder re-index by default; auto-watch remains an open decision.
-- Groq is the Phase 1 provider through its OpenAI-compatible API. OpenAI, Gemini, Anthropic, and Ollama remain later adapters.
+- Groq, OpenAI, and Gemini are implemented provider families. Anthropic and
+  Ollama remain optional later adapters.
 - Confidence is an application-owned evidence metric, never an LLM claim of truth.

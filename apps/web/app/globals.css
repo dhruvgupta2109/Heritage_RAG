@@ -718,7 +718,8 @@ summary:focus-visible {
 .answer-copy {
   color: #30394d;
   font-size: 15px;
-  line-height: 1.78;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
 .answer-copy > :first-child {
@@ -730,18 +731,64 @@ summary:focus-visible {
 }
 
 .answer-copy p {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
+}
+
+.answer-copy h1,
+.answer-copy h2,
+.answer-copy h3,
+.answer-copy h4,
+.answer-copy h5,
+.answer-copy h6 {
+  margin: 1.45em 0 0.55em;
+  color: #252e42;
+  font-family: inherit;
+  font-weight: 750;
+  letter-spacing: -0.018em;
+  line-height: 1.28;
+}
+
+.answer-copy h1 {
+  font-size: 1.42em;
+}
+
+.answer-copy h2 {
+  font-size: 1.28em;
+}
+
+.answer-copy h3 {
+  font-size: 1.14em;
+}
+
+.answer-copy h4 {
+  font-size: 1em;
+  letter-spacing: 0;
+}
+
+.answer-copy h5,
+.answer-copy h6 {
+  font-size: 0.92em;
+  letter-spacing: 0;
 }
 
 .answer-copy ol,
 .answer-copy ul {
-  margin: 8px 0 14px;
-  padding-left: 1.55rem;
+  margin: 7px 0 16px;
+  padding-left: 1.65rem;
 }
 
 .answer-copy li {
-  margin: 6px 0;
-  padding-left: 4px;
+  margin: 7px 0;
+  padding-left: 3px;
+}
+
+.answer-copy li > p {
+  margin-bottom: 5px;
+}
+
+.answer-copy li > ol,
+.answer-copy li > ul {
+  margin: 5px 0 7px;
 }
 
 .answer-copy li::marker {
@@ -752,6 +799,152 @@ summary:focus-visible {
 .answer-copy strong {
   color: #252e42;
   font-weight: 730;
+}
+
+.answer-copy em {
+  color: #454e62;
+}
+
+.answer-link {
+  color: #5847ba;
+  font-weight: 620;
+  text-decoration-color: rgba(88, 71, 186, 0.36);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.answer-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.answer-copy blockquote {
+  margin: 17px 0;
+  border-left: 3px solid rgba(100, 81, 199, 0.5);
+  border-radius: 0 12px 12px 0;
+  padding: 11px 14px;
+  color: #586175;
+  background: rgba(103, 86, 209, 0.055);
+}
+
+.answer-copy blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.answer-copy hr {
+  height: 1px;
+  margin: 22px 0;
+  border: 0;
+  background: rgba(54, 65, 91, 0.12);
+}
+
+.answer-copy code {
+  border: 1px solid rgba(70, 78, 104, 0.1);
+  border-radius: 5px;
+  padding: 0.12em 0.34em;
+  color: #4e3fa0;
+  background: rgba(86, 71, 171, 0.07);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.86em;
+}
+
+.answer-copy pre {
+  max-width: 100%;
+  margin: 17px 0;
+  overflow-x: auto;
+  border: 1px solid rgba(51, 61, 87, 0.13);
+  border-radius: 13px;
+  padding: 14px 16px;
+  color: #e8eaf3;
+  background: #252a38;
+  font-size: 0.86em;
+  line-height: 1.6;
+  scrollbar-width: thin;
+}
+
+.answer-copy pre code {
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-size: inherit;
+}
+
+.answer-table-wrap {
+  width: 100%;
+  margin: 18px 0 20px;
+  overflow-x: auto;
+  border: 1px solid rgba(56, 66, 94, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: 0 10px 30px rgba(62, 60, 92, 0.055);
+  scrollbar-width: thin;
+}
+
+.answer-table-wrap:focus-visible {
+  outline: 3px solid rgba(60, 90, 210, 0.28);
+  outline-offset: 2px;
+}
+
+.answer-table-wrap table {
+  width: 100%;
+  min-width: 570px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9em;
+  line-height: 1.55;
+}
+
+.answer-table-wrap th,
+.answer-table-wrap td {
+  min-width: 120px;
+  border-right: 1px solid rgba(56, 66, 94, 0.09);
+  border-bottom: 1px solid rgba(56, 66, 94, 0.09);
+  padding: 11px 13px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.answer-table-wrap th {
+  color: #30384c;
+  background: rgba(102, 83, 202, 0.09);
+  font-size: 0.92em;
+  font-weight: 760;
+}
+
+.answer-table-wrap tbody tr:nth-child(even) td {
+  background: rgba(102, 83, 202, 0.025);
+}
+
+.answer-table-wrap tr > :last-child {
+  border-right: 0;
+}
+
+.answer-table-wrap tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.answer-copy img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.answer-copy del {
+  color: #7d8493;
+}
+
+.answer-copy input[type="checkbox"] {
+  margin-right: 7px;
+  accent-color: #6655ca;
+}
+
+.answer-copy .contains-task-list {
+  padding-left: 0;
+  list-style: none;
+}
+
+.answer-copy .task-list-item {
+  padding-left: 0;
 }
 
 .citation {
@@ -1815,6 +2008,7 @@ summary:focus-visible {
 
   .answer-copy {
     font-size: 14px;
+    line-height: 1.68;
   }
 
   .composer-zone {

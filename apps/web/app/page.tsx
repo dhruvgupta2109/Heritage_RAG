@@ -73,7 +73,7 @@ type RetrievalOption = {
   description: string;
 };
 
-type Source = {
+export type Source = {
   id: number;
   chunk_id: string;
   document_id: string;
@@ -338,7 +338,7 @@ function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
   );
 }
 
-function AnswerMarkdown({
+export function AnswerMarkdown({
   content,
   sources,
 }: {
@@ -349,10 +349,9 @@ function AnswerMarkdown({
     () => new Map(sources.map((source) => [source.id, source])),
     [sources],
   );
-  const markdown = content.replace(
-    /\[(\d+)]/g,
-    "[$1](#heritage-source-$1)",
-  );
+  const markdown = content
+    .replace(/\[(\d+)]\s+([,.;:!?])/g, "[$1]$2")
+    .replace(/\[(\d+)]/g, "[$1](#heritage-source-$1)");
 
   return (
     <ReactMarkdown
@@ -362,7 +361,12 @@ function AnswerMarkdown({
           const match = href?.match(/^#heritage-source-(\d+)$/);
           if (!match) {
             return (
-              <a href={href} target="_blank" rel="noreferrer">
+              <a
+                className="answer-link"
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+              >
                 {children}
               </a>
             );
@@ -390,6 +394,16 @@ function AnswerMarkdown({
             </a>
           );
         },
+        table: ({ children }) => (
+          <div
+            className="answer-table-wrap"
+            role="region"
+            aria-label="Answer table"
+            tabIndex={0}
+          >
+            <table>{children}</table>
+          </div>
+        ),
       }}
     >
       {markdown}

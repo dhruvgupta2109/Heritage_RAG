@@ -114,6 +114,20 @@ Every completed assistant answer follows this order:
 4. Expandable **Sources** list with document, page/range, section, and snippet.
 5. Message actions such as copy or retry.
 
+Within the answer content, use the structure that best matches the information:
+short prose for a direct fact, bullets for an unordered set, numbered lists for
+steps or sequences, and compact tables for comparisons, schedules, or repeated
+attributes. Use descriptive headings only when the answer contains multiple
+distinct sections. Avoid unnecessary headings, one-column tables, and decorative
+formatting. Citations stay attached to the factual sentence, list item, or table
+row they support.
+
+Rendered Markdown uses consistent vertical rhythm for paragraphs, headings,
+lists, nested lists, quotations, code, and separators. Tables use a bordered
+header/row grid with comfortable cell padding and alternating row tint. A table
+that exceeds the answer width scrolls horizontally inside its own
+keyboard-focusable region instead of compressing or overlapping columns.
+
 The **Answered from** row is always visible. If a reliable page does not exist, display **Page unavailable · Section name**; never infer a page for visual consistency. If no evidence exists, display **Answered from: No supporting document found** and omit citation markers.
 
 ### 4.5 Sources list and preview

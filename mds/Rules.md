@@ -12,6 +12,10 @@ These rules turn the PRD into mandatory engineering and product constraints. If 
 ## 2. Grounding and Answer Rules
 
 - Answer document questions from retrieved indexed evidence.
+- Format each answer in clear GitHub-flavored Markdown using the structure that
+  best improves comprehension: direct prose, bullets, numbered steps, compact
+  tables, or short section headings as appropriate. Do not force complex
+  formatting onto simple answers.
 - Every material factual claim must map to at least one valid retrieved chunk.
 - Every completed answer with evidence must show inline citations and an expandable source list.
 - Every completed answer must show an **Answered from** summary. When no evidence exists, it reads **No supporting document found** and no citation is fabricated.
@@ -80,6 +84,9 @@ These rules turn the PRD into mandatory engineering and product constraints. If 
 - Glass effects must have an opaque fallback and remain readable without blur.
 - Meet WCAG 2.2 AA contrast and provide visible focus.
 - Make every hover-only interaction available through keyboard focus and touch.
+- Render all supported Markdown with readable spacing. Wide answer tables must
+  keep distinct columns and scroll within a keyboard-focusable container rather
+  than overflow or collapse.
 - Do not use color as the only indication of confidence, error, success, or selection.
 - Use semantic controls and accessible names for citation markers, dialogs, drawers, disclosures, and message actions.
 - Respect reduced motion and reduced transparency preferences.

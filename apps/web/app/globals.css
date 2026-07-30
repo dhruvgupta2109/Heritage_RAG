@@ -1356,8 +1356,13 @@ summary:focus-visible {
   max-height: min(62vh, 430px);
   overflow-y: auto;
   scrollbar-width: thin;
+  border: 1px solid #e3e4ed;
   border-radius: 15px;
   padding: 7px;
+  background: #fbfbff;
+  box-shadow: 0 20px 52px rgba(51, 48, 80, 0.2);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   animation: selector-in 140ms ease-out;
 }
 

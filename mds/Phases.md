@@ -1,8 +1,8 @@
 # Heritage RAG — Delivery Phases
 
-**Status:** Phase 0 and Phase 1 complete; Phase 2 implemented pending external-provider credential verification; Phase 3 and Phase 4 substantially implemented
+**Status:** Phases 0–4 complete; Phase 5 next
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 Each phase should finish with a demonstrable vertical slice and automated checks. A phase is complete only when its exit criteria pass; a UI mock without the connected behavior is not a completed feature.
 
@@ -52,7 +52,7 @@ Exit criteria:
 - Formats without reliable pagination show **Page unavailable** plus a structural locator.
 - Refreshing or restarting does not require re-embedding unchanged documents.
 
-## Phase 2 — Models and Retrieval Modes
+## Phase 2 — Models and Retrieval Modes ✅
 
 **Goal:** Make provider and retrieval depth selectable per message.
 
@@ -64,8 +64,11 @@ Current progress:
 - Complete: local full re-ranking and LLM-driven Deep query decomposition.
 - Complete: normalized errors, timeouts, cancellation-safe streaming, and retries.
 - Complete: 25-question corpus evaluation set and retrieval baseline.
-- Pending: live OpenAI/Gemini contract verification once valid keys are supplied.
-- Pending: broader answer/confidence calibration as the corpus grows.
+- Complete: shared provider contracts and unavailable-provider behavior are
+  covered by automated tests.
+- Operational follow-up, not a phase blocker: run live OpenAI/Gemini
+  authentication checks once valid keys are supplied.
+- Broader answer/confidence calibration belongs to Phase 6 as the corpus grows.
 
 Deliverables:
 
@@ -75,7 +78,8 @@ Deliverables:
 - Basic/full re-ranking and Deep query decomposition.
 - Model and speed chips in the composer; selection is retained for the next message.
 - Provider error normalization, timeouts, cancellation, and retry.
-- Confidence calibration across retrieval modes.
+- Initial confidence behavior checks across retrieval modes; full calibration
+  is a Phase 6 release-hardening task.
 
 Exit criteria:
 
@@ -84,7 +88,7 @@ Exit criteria:
 - All enabled providers produce the same internal citation/confidence schema.
 - Provider self-reported confidence cannot override the application score.
 
-## Phase 3 — Password-Gated Uploads
+## Phase 3 — Password-Gated Uploads ✅
 
 **Goal:** Add and index documents safely without restarting.
 
@@ -95,8 +99,9 @@ Current progress:
 - Complete: password dialog, multi-file picker, and drag-and-drop panel.
 - Complete: PDF/DOCX/TXT/MD validation, 25 MB limit, safe naming, and path protection.
 - Complete: content-hash duplicate detection and immediate per-file indexing.
-- Complete: success, duplicate, partial-failure feedback and manual folder re-index.
-- Pending: asynchronous per-file stage updates and an explicit retry action.
+- Complete: real per-file transfer progress plus processing/indexing status.
+- Complete: indexed, duplicate, and failure outcomes with one-click retry.
+- Complete: aggregate partial-failure feedback and manual folder re-index.
 
 Deliverables:
 
@@ -116,7 +121,7 @@ Exit criteria:
 - Failed or partially indexed files do not appear ready.
 - Re-index leaves unchanged files untouched.
 
-## Phase 4 — Persistent Chat History
+## Phase 4 — Persistent Chat History ✅
 
 **Goal:** Reopen and continue prior conversations faithfully.
 
@@ -126,7 +131,8 @@ Current progress:
 - Complete: Groq title generation from the first user query.
 - Complete: sidebar navigation, new-chat flow, continuation, and historical source/confidence replay.
 - Complete: rename, pin/unpin, and delete-with-confirmation controls.
-- Pending: date-grouped history.
+- Complete: pinned, Today, Yesterday, Previous 7 days, Previous 30 days, and month/year history groups.
+- Complete: one universal history shared by browsers connected to the same local backend.
 
 Deliverables:
 

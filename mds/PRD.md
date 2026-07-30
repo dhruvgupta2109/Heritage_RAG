@@ -1,9 +1,9 @@
 # RAG Knowledge Assistant — Product Requirements Document
 
-**Status:** v1.3 — implementation in progress through Phase 4
+**Status:** v1.4 — Phases 0–4 complete; Phase 5 next
 **Owner:** You
 **Target environment:** Localhost (single user, local machine)
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 ---
 
@@ -33,7 +33,8 @@ A locally-hosted chat application that lets you ask questions over a folder of y
 ## 4. User Stories
 
 - As the user, I open localhost, see a clean chat screen, and ask a question about my docs.
-- As the user, I use Groq in Phase 1 and can choose another configured provider once multi-provider support is added.
+- As the user, I use Groq by default and can choose any other configured,
+  authenticated provider from the same model selector.
 - As the user, I pick "Quick," "Medium," or "Deep" depending on how thorough I want the answer.
 - As the user, I click an upload control, enter a password, and drop in new files that get added to the searchable index.
 - As the user, I see a sidebar of past chats, click one, and continue where I left off.
@@ -82,7 +83,11 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
   hash is stored server-side and it can be overridden through local configuration.
 - Password is checked against a locally stored hash (e.g. in `.env` or a small config file) — not a full auth system, just a gate.
 - Supports drag-and-drop or file picker; accepts PDF, DOCX, TXT, MD (CSV optional) — matches whatever folder-based ingestion supports.
-- On upload: file is chunked, embedded, and added to the vector store; a success confirmation shows what was indexed.
+- On upload: each file shows real transfer progress, a processing/indexing state,
+  and an independent indexed, duplicate, or failed outcome. Failed files can be
+  retried without re-selecting the completed files.
+- A successful file is chunked, embedded, and added to the vector store; the
+  completion summary shows what was indexed.
 - Also supports pointing at the existing docs folder for a one-time or on-demand re-index (in case you drop files there directly instead of uploading).
 
 ### 5.5 Chat History
@@ -91,6 +96,11 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
 - Stored locally (e.g. SQLite) — no cloud sync in v1.
 - Delete/rename controls, like standard AI chat apps.
 - Pin/unpin controls keep important conversations above recent history.
+- History is grouped into Pinned, Today, Yesterday, Previous 7 days, Previous
+  30 days, and month/year sections.
+- History is universal to the local installation: browsers connected to the
+  same backend share one SQLite history. Browser-specific or private per-user
+  history requires accounts and is outside v1.
 
 ### 5.6 Glass Minimalist UI
 - Frosted-glass panels (translucency + backdrop blur) over a soft gradient or subtly textured background.
@@ -204,27 +214,29 @@ Controls how much retrieval/reasoning work happens before answering. Maps to con
 | Vector DB | Chroma (local, file-based) | Zero-infra, persists to disk, great for localhost |
 | Embeddings | Local Chroma ONNX `all-MiniLM-L6-v2` | Free, private, and requires no embedding API |
 | Chat history/metadata | SQLite | Zero-config, file-based, plenty for single-user |
-| LLM providers | Groq for Phase 1; OpenAI/Gemini in Phase 2; optional Anthropic/Ollama later | Keeps every provider behind the same grounded answer contract |
+| LLM providers | Groq, OpenAI, and Gemini adapters; optional Anthropic/Ollama later | Keeps every provider behind the same grounded answer contract |
 
 ## 10. Milestones
 
-1. **MVP** — folder ingestion with page-aware provenance, single model, grounded chat, citations, and confidence output; no history/upload UI yet.
-2. **Multi-model + Speed modes** — Groq, OpenAI, and Gemini adapters;
+1. **MVP — complete** — folder ingestion with page-aware provenance, single model, grounded chat, citations, and confidence output.
+2. **Multi-model + Speed modes — complete** — Groq, OpenAI, and Gemini adapters;
    availability-aware model selection; Quick vector, Medium hybrid, and Deep
    query-expansion/full-rerank retrieval.
-3. **Password-protected upload** — add-to-index flow from the UI.
-4. **Chat history** — sidebar, persistence, rename/delete, and pin/unpin.
-5. **Glass UI polish** — final visual pass, answer source treatment, confidence badge/popover, light/dark mode, accessibility, and animations/transitions.
+3. **Password-protected upload — complete** — add-to-index flow from the UI.
+4. **Chat history — complete** — sidebar, persistence, date grouping,
+   rename/delete, and pin/unpin.
+5. **Glass UI polish — next** — final visual pass, answer source treatment,
+   confidence badge/popover, light/dark mode, accessibility, and
+   animations/transitions.
 
 ## 11. Open Questions
 
-- Groq, OpenAI, and Gemini are the Phase 2 provider set. Anthropic/Ollama remain optional.
+- Anthropic/Ollama remain optional future providers.
 - Roughly how many documents / what total size will the full corpus contain?
 - Do you want the docs folder auto-watched for changes, or is a manual "re-index" button enough?
-- Any preference between Chroma and alternatives (e.g. Qdrant, FAISS) — Chroma is recommended for simplicity but not mandatory.
-- One shared upload password is confirmed for the single-user localhost version.
 
 ---
 
-*Next step: finish per-file asynchronous upload progress/retry, date-grouped
-history, provider credential verification, and release hardening.*
+*Next step: begin Phase 5 UI/accessibility hardening. Live OpenAI/Gemini
+authentication can be checked independently when valid credentials are
+supplied.*

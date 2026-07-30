@@ -1,10 +1,10 @@
 # Heritage RAG — Product Design System
 
-**Status:** Proposed
+**Status:** Phases 0–4 interaction baseline implemented; Phase 5 polish and accessibility audit next
 
 **Applies to:** Web UI v1
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 ## 1. Design Direction
 
@@ -85,7 +85,8 @@ If `backdrop-filter` is unavailable or reduced transparency is enabled, use the 
 ### 4.1 History sidebar
 
 - Product mark/name at the top, followed by **New chat**.
-- Search/filter and chronological conversation groups.
+- Search/filter and chronological groups: Pinned, Today, Yesterday, Previous 7
+  days, Previous 30 days, then month/year.
 - Rename, pin/unpin, and delete appear in an overflow menu; deletion requires confirmation.
 - Model, retrieval, and chat-history overflow menus close when another menu is
   chosen, the user clicks or taps outside, or Escape is pressed.
@@ -191,8 +192,11 @@ Do not hide these warnings behind hover and do not render a confident-looking an
 1. User chooses **Add documents**.
 2. A small unlock dialog requests the upload password.
 3. On success, a larger glass panel accepts drag-and-drop or file selection.
-4. Each file shows validation, upload, parsing, embedding, and indexed states.
-5. Completion states list exactly what was indexed, skipped as duplicate, or failed.
+4. Each file shows real transfer progress, then a processing/indexing state.
+5. Completion states list exactly what was indexed, already present as a
+   duplicate, or failed.
+6. A failed row keeps its actionable error and offers **Retry** without
+   restarting successful rows.
 
 Password errors are generic. Unsupported file type and size errors are specific and actionable.
 

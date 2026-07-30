@@ -2,12 +2,12 @@
 
 This file is the concise handoff record for future work. Update it whenever a decision changes, a phase is completed, or a new blocker appears. Do not use it as a replacement for the PRD or architecture.
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
-**Current phase:** Phase 1 complete; Phase 2 implementation complete pending valid OpenAI/Gemini credentials; Phase 3 and Phase 4 substantially implemented
+**Current phase:** Phases 0–4 complete; Phase 5 is ready to start
 
 **Implementation status:** Runnable local multi-provider RAG app with Groq
-generation, dormant OpenAI/Gemini adapters, local hybrid/full re-ranking, Deep
+generation, availability-aware OpenAI/Gemini adapters, local hybrid/full re-ranking, Deep
 query decomposition, citations, confidence, evaluation data, password-gated
 document uploads, persistent chat actions, and a connected glass chat UI.
 
@@ -20,8 +20,8 @@ Heritage RAG is a single-user, localhost document assistant with:
 - A five-level evidence confidence system: Very high, High, Medium, Low, and Very low.
 - A glass confidence badge whose hover/focus/tap popover explains all five states and highlights the active state.
 - Per-message model choice and Quick, Medium, or Deep retrieval.
-- Password-gated uploads and manual folder re-indexing.
-- Local chat history with rename, pin/unpin, and confirmed deletion.
+- Password-gated uploads with per-file progress/retry and manual folder re-indexing.
+- Universal local chat history with date grouping, rename, pin/unpin, and confirmed deletion.
 - A minimalist glass UI with light/dark themes and WCAG 2.2 AA behavior.
 
 ## Confirmed Decisions
@@ -41,24 +41,31 @@ Heritage RAG is a single-user, localhost document assistant with:
 - No source evidence means Very low confidence and an explicit no-support response.
 - Page numbers must come from reliable extraction metadata. If unavailable, show **Page unavailable** and a section/paragraph/line locator; never fabricate a page.
 - Answer text, citations, **Answered from**, and confidence snapshots are stored together so history is reproducible.
+- Conversations are universal within this localhost installation: every browser
+  connected to the same FastAPI/SQLite backend sees the same chat history.
+  Per-user/private history requires accounts and is outside v1.
 - Manual folder re-indexing is the initial default.
 - Document upload uses the shared local password `Password`, stored as a bcrypt
   hash, with a 10-minute HTTP-only session and five-attempt rate limit.
 - Uploaded files are limited to 25 MB each and PDF, DOCX, TXT, or MD.
 - OCR is not required for the current corpus.
 
-## Phase 1 Completed
+## Phases 0–4 Completed
 
 - Added the Next.js glass chat UI and connected it to the streaming API.
 - Added the FastAPI application, health check, CORS, source-file preview, and re-index route.
 - Added PDF, DOCX, TXT, and MD extraction with page/structural provenance.
-- Added checksum-based idempotent ingestion. The current corpus has three PDFs and 12 indexed chunks.
+- Added checksum-based idempotent ingestion. The current corpus has four PDFs and 16 indexed chunks.
 - Added persistent Chroma search with local embeddings and basic lexical re-ranking.
 - Added a Groq provider adapter with provider-safe error handling.
 - Added per-message selection between GPT-OSS 120B and GPT-OSS 20B.
 - Added functional Quick, Medium, and Deep retrieval profiles.
 - Added OpenAI Responses API and Gemini Generate Content adapters. Their models
   remain disabled until the corresponding key authenticates and grants model access.
+- Phase 2 is implementation-complete: provider adapters, shared schemas,
+  availability behavior, retrieval modes, timeouts, and retries are covered by
+  automated tests. Live OpenAI/Gemini authentication is an operational check
+  awaiting valid keys and does not block Phase 5.
 - Added provider health/model-access checks, normalized safe errors, timeouts,
   cancellation-safe streaming, and transient retries.
 - Upgraded Deep retrieval to LLM query expansion plus local vector/BM25/RRF
@@ -78,8 +85,12 @@ Heritage RAG is a single-user, localhost document assistant with:
   migration of existing SQLite data.
 - Added password-gated multi-document upload, secure session/rate limiting,
   content and size validation, safe naming, duplicate detection, and immediate indexing.
+- Added real per-file transfer progress, processing/indexing states, durable
+  indexed/duplicate/failure outcomes, and one-click retry.
+- Added date-grouped history for pinned chats, Today, Yesterday, Previous 7
+  days, Previous 30 days, and older month/year groups.
 - Hid the Next.js development indicator from the app preview.
-- Added 34 passing backend tests, three focused web Markdown-rendering tests,
+- Added 34 passing backend tests, seven focused web rendering/interaction tests,
   and a successful production frontend build.
 - Verified the known answer: Experience, Reflection, Dialogue, and Understanding from `Experiential Learning at HXLS Noida | Learning by Doing.pdf`, Page 1, with High confidence.
 - Verified an unrelated query returns no source and Very low confidence.
@@ -96,7 +107,7 @@ Heritage RAG is a single-user, localhost document assistant with:
 ## Open Product Decisions
 
 - Approximate number and total size of source documents.
-- Whether Anthropic or Ollama should be added after OpenAI/Gemini credentials work.
+- Whether Anthropic or Ollama should be added after live OpenAI/Gemini verification.
 - Whether folder auto-watch is worth adding after manual re-index.
 - Whether DOCX should be converted/rendered to create stable page locations or use structural locators only.
 - Whether CSV should be supported in addition to the current 25 MB
@@ -106,12 +117,10 @@ These decisions should be captured in the PRD, Architecture, and this file when 
 
 ## Next Recommended Work
 
-Review the connected upload and history controls locally, then:
-
-1. Add asynchronous per-file upload stage updates and explicit retry.
-2. Add date grouping to long chat histories.
-3. Replace the invalid OpenAI/Gemini credentials and run provider contract checks.
-4. Expand and calibrate the evaluation set as more documents are added.
+1. Start Phase 5 glass UI, responsive, dark-theme, and accessibility hardening.
+2. When valid OpenAI/Gemini credentials are available, run the optional live
+   authentication checks; this is not a Phase 5 prerequisite.
+3. Expand and calibrate the evaluation set as more documents are added.
 
 ## Known Risks
 
@@ -124,6 +133,17 @@ Review the connected upload and history controls locally, then:
 - Next.js 16.2.12 currently includes a transitive PostCSS advisory. Current use is localhost-only with repository-controlled CSS; upgrade when a patched stable Next.js version is available.
 
 ## Change Log
+
+### 2026-07-30
+
+- Completed Phase 3 with real per-file upload progress, processing/indexing
+  feedback, independent final outcomes, expired-session recovery, and retry.
+- Completed Phase 4 with calendar date-grouped history.
+- Confirmed that chat history and the document corpus are universal to the
+  single local backend rather than isolated by browser.
+- Reconciled all project documentation: Phases 0–4 are complete and Phase 5 is
+  the next implementation phase. OpenAI/Gemini live authentication remains a
+  credential-dependent operational check, not unfinished Phase 2 code.
 
 ### 2026-07-29
 

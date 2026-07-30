@@ -1846,18 +1846,19 @@ summary:focus-visible {
 }
 
 .selected-file-list {
-  max-height: 150px;
+  max-height: 235px;
   overflow-y: auto;
   border-top: 1px solid rgba(53, 64, 92, 0.08);
 }
 
 .selected-file {
-  min-height: 39px;
-  padding: 0 10px;
+  min-height: 52px;
+  padding: 9px 10px;
   display: grid;
-  grid-template-columns: 20px 1fr auto;
-  align-items: center;
-  gap: 7px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 7px;
+  row-gap: 6px;
   color: #777f91;
 }
 
@@ -1865,21 +1866,99 @@ summary:focus-visible {
   border-top: 1px solid rgba(53, 64, 92, 0.07);
 }
 
-.selected-file svg {
+.selected-file > svg {
+  margin-top: 2px;
   color: #6655c3;
 }
 
-.selected-file span {
+.selected-file-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.selected-file-copy span {
   overflow: hidden;
   color: #4d5669;
   font-size: 10px;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.selected-file small {
+.selected-file-copy small {
   color: #9198a6;
   font-size: 9px;
+}
+
+.selected-file-status {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  color: #737c8e;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.selected-file-status svg {
+  flex: 0 0 auto;
+}
+
+.selected-file.is-indexed .selected-file-status,
+.selected-file.is-duplicate .selected-file-status {
+  color: #267858;
+}
+
+.selected-file.is-failed .selected-file-status {
+  color: #ad4152;
+}
+
+.file-progress {
+  grid-column: 2 / -1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8e6f3;
+}
+
+.file-progress span {
+  height: 100%;
+  border-radius: inherit;
+  display: block;
+  background: linear-gradient(90deg, #7764df, #9b7ce8);
+  transition: width 120ms ease;
+}
+
+.file-error {
+  grid-column: 2 / -1;
+  margin: 0;
+  color: #a14438;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.file-retry {
+  min-height: 22px;
+  border: 1px solid rgba(173, 65, 82, 0.2);
+  border-radius: 7px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #a33d50;
+  background: #fff7f9;
+  font: inherit;
+  cursor: pointer;
+}
+
+.file-retry:hover,
+.file-retry:focus-visible {
+  border-color: rgba(173, 65, 82, 0.38);
+  background: #ffedf1;
 }
 
 @keyframes modal-in {

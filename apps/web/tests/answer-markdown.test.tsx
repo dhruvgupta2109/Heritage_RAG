@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   AnswerMarkdown,
+  groupChatsByDate,
+  type ChatSummary,
   type Source,
 } from "../app/page";
 
@@ -152,4 +154,79 @@ test("all dropdown families share outside-click and Escape closing", () => {
   assert.match(page, /addEventListener\("pointerdown", handleOutsidePointer\)/);
   assert.match(page, /if \(!menu\.contains\(target\)\) menu\.open = false/);
   assert.match(page, /addEventListener\("keydown", handleMenuEscape\)/);
+});
+
+test("chat history is grouped by pinned and calendar date", () => {
+  const now = new Date(2026, 6, 30, 12);
+  const daysAgo = (days: number) => {
+    const value = new Date(now);
+    value.setDate(value.getDate() - days);
+    return value.toISOString();
+  };
+  const chat = (
+    id: string,
+    updatedAt: string,
+    pinned = false,
+  ): ChatSummary => ({
+    id,
+    title: `Chat ${id}`,
+    pinned,
+    created_at: updatedAt,
+    updated_at: updatedAt,
+    message_count: 2,
+  });
+  const chats = [
+    chat("previous-month", daysAgo(45)),
+    chat("previous-30", daysAgo(12)),
+    chat("pinned", daysAgo(1), true),
+    chat("today", daysAgo(0)),
+    chat("previous-7", daysAgo(3)),
+    chat("yesterday", daysAgo(1)),
+  ];
+
+  const groups = groupChatsByDate(chats, now);
+
+  assert.deepEqual(
+    groups.map((group) => group.label),
+    [
+      "Pinned",
+      "Today",
+      "Yesterday",
+      "Previous 7 days",
+      "Previous 30 days",
+      "June 2026",
+    ],
+  );
+  assert.deepEqual(
+    groups.map((group) => group.chats.map((item) => item.id)),
+    [
+      ["pinned"],
+      ["today"],
+      ["yesterday"],
+      ["previous-7"],
+      ["previous-30"],
+      ["previous-month"],
+    ],
+  );
+});
+
+test("document uploads expose real per-file progress, indexing, and retry states", () => {
+  const page = readFileSync(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const css = readFileSync(
+    new URL("../app/globals.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(page, /new XMLHttpRequest\(\)/);
+  assert.match(page, /request\.upload\.addEventListener\("progress"/);
+  assert.match(page, /status: "indexing"/);
+  assert.match(page, /Processing & indexing/);
+  assert.match(page, /Already indexed/);
+  assert.match(page, /uploadDocuments\(\[item]\)/);
+  assert.ok(css.includes(".file-progress"));
+  assert.ok(css.includes(".file-retry"));
+  assert.ok(css.includes(".file-error"));
 });

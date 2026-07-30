@@ -1,5 +1,9 @@
 # Heritage RAG
 
+**Status:** Phases 0–4 complete; Phase 5 is next
+
+**Last updated:** 2026-07-30
+
 A localhost, single-user knowledge assistant for asking grounded questions over personal documents. Heritage combines page-level citations, evidence-based confidence, selectable LLM providers, adjustable retrieval depth, password-gated document ingestion, persistent chat history, and a minimalist glass interface.
 
 ## Product Contract
@@ -14,7 +18,7 @@ Every completed answer must include:
 
 If information is not supported by indexed documents, Heritage says so, shows **Answered from: No supporting document found**, and uses Very low confidence. It never fabricates a citation or page number; non-paginated sources show **Page unavailable** with the best structural locator.
 
-## Implemented Phase 1 Stack
+## Current Implementation Stack
 
 - Next.js 16 + React 19 + Tailwind CSS
 - FastAPI
@@ -67,7 +71,7 @@ npm run eval -- --mode medium
 
 The Phase 1 corpus test asks `What are the four components of experiential learning?` and expects `Experiential Learning at HXLS Noida | Learning by Doing.pdf`, Page 1. The verified answer identifies Experience, Reflection, Dialogue, and Understanding.
 
-## Phase 1 Scope
+## Implemented Through Phase 4
 
 Implemented:
 
@@ -85,22 +89,29 @@ Implemented:
 - Persistent SQLite chat history with sidebar loading and continuation.
 - Groq-generated conversation titles based on each chat's first user question.
 - Persistent rename, pin/unpin, and confirmed chat deletion controls.
+- Calendar-grouped history for pinned chats, Today, Yesterday, recent ranges,
+  and older month/year sections. History is shared by every browser connected
+  to the same local backend.
 - Password-gated multi-document upload with a short-lived HTTP-only session,
   rate limiting, safe file validation, duplicate detection, and immediate
   indexing.
+- Real per-file upload progress, processing/indexing status, independent
+  indexed/duplicate/failure results, and one-click retry.
 - Manual folder re-indexing for documents copied directly into `DOCS/`.
 - Citation validation, source/page links, query-aware snippets, and **Answered from**.
 - Evidence confidence calculation and all five glass UI states.
 - Explicit no-evidence behavior with Very low confidence.
 
 The current corpus includes a 25-question evaluation set covering expected
-document/page retrieval and explicit no-answer cases. Per-file asynchronous
-upload progress/retry, date-grouped history, optional Anthropic/Ollama adapters,
-and broader confidence calibration are later work.
+document/page retrieval and explicit no-answer cases. Optional
+Anthropic/Ollama adapters and broader confidence calibration are later work.
+The OpenAI and Gemini adapters are implemented and contract-tested; their live
+authentication check is an operational follow-up once valid keys are supplied,
+not a blocker for starting Phase 5.
 
 ## Current Limitations
 
-- OCR is intentionally excluded from Phase 1.
+- OCR is intentionally excluded from the current scope.
 - Confidence thresholds are initial values and still need evaluation-set calibration.
 - The current stable Next.js release includes a transitive PostCSS security advisory. Heritage does not accept or process user-supplied CSS and binds to localhost, but the dependency should be upgraded when Next.js ships a patched stable release.
 

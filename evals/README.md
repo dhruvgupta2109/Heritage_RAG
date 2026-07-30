@@ -1,5 +1,9 @@
 # Heritage Evaluation Set
 
+**Status:** Pre-Phase-5 retrieval baseline complete
+
+**Last updated:** 2026-07-30
+
 `questions.json` contains 25 questions derived from the current `DOCS/`
 corpus:
 

@@ -1,5 +1,9 @@
 # Heritage RAG — Project Rules
 
+**Status:** Current for completed Phases 0–4; Phase 5 next
+
+**Last updated:** 2026-07-30
+
 These rules turn the PRD into mandatory engineering and product constraints. If a rule conflicts with a later approved requirement, update the PRD, architecture, design, phases, and this file in the same change.
 
 ## 1. Product Scope

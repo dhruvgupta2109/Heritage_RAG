@@ -2,11 +2,11 @@
 
 > This filename is retained for compatibility. The canonical project architecture is defined here.
 
-**Status:** Proposed
+**Status:** Pre-Phase-5 architecture implemented (Phases 0–4 complete)
 
 **Target:** Single-user localhost application
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 ## 1. System Context
 
@@ -229,6 +229,10 @@ also persist their editable title and pinned state. An assistant message stores
 its final rendered text, model, retrieval mode, citations JSON, confidence JSON,
 timestamps, and status. Document records store identity, checksum, media type,
 original path, ingestion state, and timestamps.
+
+The SQLite history is installation-wide, not browser-local: all browsers
+connected to the same backend list and modify the same chats. v1 has no user
+identity or private history boundary.
 
 Chroma stores embeddings and the chunk metadata needed to resolve a result. SQLite is the record of lifecycle state; Chroma is the retrieval index. Deleting or replacing a document must update both stores in one coordinated operation and report partial failures.
 

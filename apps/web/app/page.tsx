@@ -20,6 +20,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  RotateCcw,
   Search,
   Send,
   ShieldCheck,
@@ -103,7 +104,7 @@ type Message = {
   error?: string;
 };
 
-type ChatSummary = {
+export type ChatSummary = {
   id: string;
   title: string;
   pinned: boolean;
@@ -181,6 +182,29 @@ type IndexResult = {
 };
 
 type UploadStep = "checking" | "locked" | "ready" | "uploading";
+
+type UploadItemStatus =
+  | "ready"
+  | "queued"
+  | "uploading"
+  | "indexing"
+  | "indexed"
+  | "duplicate"
+  | "failed";
+
+type UploadItem = {
+  id: string;
+  file: File;
+  status: UploadItemStatus;
+  progress: number;
+  error?: string;
+  chunkCount?: number;
+};
+
+export type ChatHistoryGroup = {
+  label: string;
+  chats: ChatSummary[];
+};
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
@@ -265,6 +289,55 @@ function chatSort(left: ChatSummary, right: ChatSummary) {
   );
 }
 
+function calendarDay(value: Date) {
+  return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+export function groupChatsByDate(
+  chats: ChatSummary[],
+  now = new Date(),
+): ChatHistoryGroup[] {
+  const ordered = [...chats].sort(chatSort);
+  const pinned = ordered.filter((chat) => chat.pinned);
+  const groups: ChatHistoryGroup[] = pinned.length
+    ? [{ label: "Pinned", chats: pinned }]
+    : [];
+  const buckets = new Map<string, ChatSummary[]>();
+  const today = calendarDay(now);
+  const dayMilliseconds = 24 * 60 * 60 * 1000;
+
+  for (const chat of ordered) {
+    if (chat.pinned) continue;
+    const updated = new Date(chat.updated_at);
+    let label = "Older";
+
+    if (!Number.isNaN(updated.getTime())) {
+      const daysAgo = Math.floor(
+        (today - calendarDay(updated)) / dayMilliseconds,
+      );
+      if (daysAgo <= 0) label = "Today";
+      else if (daysAgo === 1) label = "Yesterday";
+      else if (daysAgo <= 7) label = "Previous 7 days";
+      else if (daysAgo <= 30) label = "Previous 30 days";
+      else {
+        label = new Intl.DateTimeFormat("en-US", {
+          month: "long",
+          year: "numeric",
+        }).format(updated);
+      }
+    }
+
+    const group = buckets.get(label);
+    if (group) group.push(chat);
+    else buckets.set(label, [chat]);
+  }
+
+  for (const [label, group] of buckets) {
+    groups.push({ label, chats: group });
+  }
+  return groups;
+}
+
 function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -276,6 +349,16 @@ async function responseError(response: Response, fallback: string) {
     return typeof body.detail === "string" ? body.detail : fallback;
   } catch {
     return fallback;
+  }
+}
+
+class UploadRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "UploadRequestError";
+    this.status = status;
   }
 }
 
@@ -539,7 +622,7 @@ export default function Home() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadStep, setUploadStep] = useState<UploadStep>("checking");
   const [uploadPassword, setUploadPassword] = useState("");
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadFiles, setUploadFiles] = useState<UploadItem[]>([]);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [draggingFiles, setDraggingFiles] = useState(false);
@@ -814,7 +897,14 @@ export default function Home() {
 
   function selectUploadFiles(files: FileList | File[]) {
     const selected = Array.from(files).slice(0, 20);
-    setUploadFiles(selected);
+    setUploadFiles(
+      selected.map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        status: "ready",
+        progress: 0,
+      })),
+    );
     setUploadFeedback(null);
     setUploadError(
       selected.length < files.length
@@ -835,56 +925,166 @@ export default function Home() {
     }
   }
 
-  async function uploadDocuments() {
-    if (!uploadFiles.length || uploadStep !== "ready") return;
+  function updateUploadItem(id: string, changes: Partial<UploadItem>) {
+    setUploadFiles((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, ...changes } : item,
+      ),
+    );
+  }
+
+  function uploadDocument(item: UploadItem) {
+    return new Promise<IndexResult>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      const form = new FormData();
+      form.append("files", item.file);
+
+      request.open("POST", `${API_URL}/api/documents/upload`);
+      request.withCredentials = true;
+      request.setRequestHeader("Accept", "application/json");
+
+      request.upload.addEventListener("loadstart", () => {
+        updateUploadItem(item.id, {
+          status: "uploading",
+          progress: 0,
+          error: undefined,
+        });
+      });
+      request.upload.addEventListener("progress", (event) => {
+        updateUploadItem(item.id, {
+          status: "uploading",
+          progress: event.lengthComputable
+            ? Math.min(100, Math.round((event.loaded / event.total) * 100))
+            : 0,
+        });
+      });
+      request.upload.addEventListener("load", () => {
+        updateUploadItem(item.id, {
+          status: "indexing",
+          progress: 100,
+        });
+      });
+      request.addEventListener("load", () => {
+        let payload: unknown = null;
+        try {
+          payload = request.responseText
+            ? JSON.parse(request.responseText)
+            : null;
+        } catch {
+          payload = null;
+        }
+
+        if (request.status >= 200 && request.status < 300) {
+          resolve(payload as IndexResult);
+          return;
+        }
+        const detail =
+          payload &&
+          typeof payload === "object" &&
+          "detail" in payload &&
+          typeof payload.detail === "string"
+            ? payload.detail
+            : "Could not upload this document.";
+        reject(new UploadRequestError(detail, request.status));
+      });
+      request.addEventListener("error", () => {
+        reject(
+          new UploadRequestError(
+            "The upload could not reach the local API. Try again.",
+            0,
+          ),
+        );
+      });
+      request.addEventListener("abort", () => {
+        reject(new UploadRequestError("The upload was stopped.", 0));
+      });
+      request.send(form);
+    });
+  }
+
+  async function uploadDocuments(items = uploadFiles.filter(
+    (item) => item.status === "ready",
+  )) {
+    if (!items.length || uploadStep !== "ready") return;
     setUploadStep("uploading");
     setUploadError(null);
     setUploadFeedback(null);
-    const form = new FormData();
-    uploadFiles.forEach((file) => form.append("files", file));
-    try {
-      const response = await fetch(`${API_URL}/api/documents/upload`, {
-        method: "POST",
-        credentials: "include",
-        body: form,
-      });
-      if (!response.ok) {
-        if (response.status === 401) setUploadStep("locked");
-        throw new Error(await responseError(response, "Could not upload documents."));
+    setUploadFiles((current) =>
+      current.map((item) =>
+        items.some((candidate) => candidate.id === item.id)
+          ? { ...item, status: "queued", progress: 0, error: undefined }
+          : item,
+      ),
+    );
+
+    let indexed = 0;
+    let duplicates = 0;
+    let failed = 0;
+    let chunkCount = 0;
+    let sessionExpired = false;
+
+    for (const item of items) {
+      try {
+        const result = await uploadDocument(item);
+        if (result.indexed.length > 0) {
+          indexed += 1;
+          chunkCount += result.chunk_count;
+          updateUploadItem(item.id, {
+            status: "indexed",
+            progress: 100,
+            chunkCount: result.chunk_count,
+          });
+        } else if (result.skipped.length > 0) {
+          duplicates += 1;
+          updateUploadItem(item.id, {
+            status: "duplicate",
+            progress: 100,
+          });
+        } else {
+          failed += 1;
+          updateUploadItem(item.id, {
+            status: "failed",
+            error:
+              Object.values(result.failed)[0] ??
+              "The document was not indexed.",
+          });
+        }
+      } catch (error) {
+        failed += 1;
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Could not upload this document.";
+        updateUploadItem(item.id, { status: "failed", error: message });
+        if (error instanceof UploadRequestError && error.status === 401) {
+          sessionExpired = true;
+          setUploadFiles((current) =>
+            current.map((candidate) =>
+              candidate.status === "queued"
+                ? { ...candidate, status: "ready" }
+                : candidate,
+            ),
+          );
+          setUploadError(
+            "Upload access expired. Unlock uploads, then retry the failed document.",
+          );
+          setUploadStep("locked");
+          break;
+        }
       }
-      const result: IndexResult = await response.json();
-      const parts: string[] = [];
-      if (result.indexed.length) {
-        parts.push(
-          `${result.indexed.length} indexed (${result.chunk_count} chunk${
-            result.chunk_count === 1 ? "" : "s"
-          })`,
-        );
-      }
-      if (result.skipped.length) {
-        parts.push(`${result.skipped.length} skipped as duplicate`);
-      }
-      if (Object.keys(result.failed).length) {
-        parts.push(`${Object.keys(result.failed).length} failed`);
-        setUploadError(
-          Object.entries(result.failed)
-            .map(([name, reason]) => `${name}: ${reason}`)
-            .join(" "),
-        );
-      }
-      setUploadFeedback(parts.join(" · ") || "No documents were added.");
-      if (result.indexed.length) {
-        setUploadFiles([]);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        await loadHealth();
-      }
-      setUploadStep("ready");
-    } catch (error) {
-      setUploadError(
-        error instanceof Error ? error.message : "Could not upload documents.",
-      );
-      setUploadStep((current) => (current === "locked" ? "locked" : "ready"));
     }
+
+    const resultParts: string[] = [];
+    if (indexed) {
+      resultParts.push(
+        `${indexed} indexed (${chunkCount} chunk${chunkCount === 1 ? "" : "s"})`,
+      );
+    }
+    if (duplicates) resultParts.push(`${duplicates} already indexed`);
+    if (failed) resultParts.push(`${failed} failed`);
+    setUploadFeedback(resultParts.join(" · ") || "No documents were added.");
+    if (indexed) await loadHealth();
+    if (!sessionExpired) setUploadStep("ready");
   }
 
   async function reindex() {
@@ -1048,9 +1248,20 @@ export default function Home() {
   }
 
   const empty = messages.length === 0;
-  const filteredChats = chats.filter((chat) =>
-    chat.title.toLowerCase().includes(historySearch.trim().toLowerCase()),
+  const filteredChats = useMemo(
+    () =>
+      chats.filter((chat) =>
+        chat.title.toLowerCase().includes(historySearch.trim().toLowerCase()),
+      ),
+    [chats, historySearch],
   );
+  const historyGroups = useMemo(
+    () => groupChatsByDate(filteredChats),
+    [filteredChats],
+  );
+  const readyUploadCount = uploadFiles.filter(
+    (item) => item.status === "ready",
+  ).length;
   const modelOptions = health?.models ?? fallbackModels;
   const retrievalOptions =
     health?.retrieval_modes ?? fallbackRetrievalModes;
@@ -1123,105 +1334,91 @@ export default function Home() {
               />
             </div>
             <div className="history-list">
-              {(
-                [
-                  [
-                    "Pinned",
-                    filteredChats.filter((chat) => chat.pinned),
-                  ],
-                  [
-                    "Recent",
-                    filteredChats.filter((chat) => !chat.pinned),
-                  ],
-                ] as const
-              ).map(
-                ([label, group]) =>
-                  group.length > 0 && (
-                    <div className="history-group" key={label}>
-                      <div className="history-label">{label}</div>
-                      {group.map((chat) => (
-                        <div
-                          className={`history-entry ${
-                            chat.id === activeChatId ? "is-selected" : ""
-                          }`}
-                          key={chat.id}
+              {historyGroups.map((group) => (
+                <div className="history-group" key={group.label}>
+                  <div className="history-label">{group.label}</div>
+                  {group.chats.map((chat) => (
+                    <div
+                      className={`history-entry ${
+                        chat.id === activeChatId ? "is-selected" : ""
+                      }`}
+                      key={chat.id}
+                    >
+                      <button
+                        className="history-item"
+                        type="button"
+                        onClick={() => void openChat(chat)}
+                        disabled={isSending}
+                        aria-pressed={chat.id === activeChatId}
+                      >
+                        <span className="history-title">
+                          {chat.pinned && (
+                            <Pin size={11} aria-label="Pinned conversation" />
+                          )}
+                          <span>{chat.title}</span>
+                        </span>
+                        <small>{relativeTime(chat.updated_at)}</small>
+                      </button>
+                      <details className="history-actions">
+                        <summary
+                          aria-label={`Actions for ${chat.title}`}
+                          title="Conversation actions"
                         >
+                          <MoreHorizontal size={16} />
+                        </summary>
+                        <div className="history-menu glass-strong" role="menu">
                           <button
-                            className="history-item"
                             type="button"
-                            onClick={() => void openChat(chat)}
-                            disabled={isSending}
-                            aria-pressed={chat.id === activeChatId}
+                            role="menuitem"
+                            onClick={(event) => {
+                              beginRename(chat);
+                              const details =
+                                event.currentTarget.closest("details");
+                              if (details) details.open = false;
+                            }}
                           >
-                            <span className="history-title">
-                              {chat.pinned && (
-                                <Pin size={11} aria-label="Pinned conversation" />
-                              )}
-                              <span>{chat.title}</span>
-                            </span>
-                            <small>{relativeTime(chat.updated_at)}</small>
+                            <Pencil size={14} />
+                            Rename
                           </button>
-                          <details className="history-actions">
-                            <summary
-                              aria-label={`Actions for ${chat.title}`}
-                              title="Conversation actions"
-                            >
-                              <MoreHorizontal size={16} />
-                            </summary>
-                            <div className="history-menu glass-strong" role="menu">
-                              <button
-                                type="button"
-                                role="menuitem"
-                                onClick={(event) => {
-                                  beginRename(chat);
-                                  const details =
-                                    event.currentTarget.closest("details");
-                                  if (details) details.open = false;
-                                }}
-                              >
-                                <Pencil size={14} />
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                onClick={(event) => {
-                                  void pinChat(chat);
-                                  const details =
-                                    event.currentTarget.closest("details");
-                                  if (details) details.open = false;
-                                }}
-                              >
-                                {chat.pinned ? (
-                                  <PinOff size={14} />
-                                ) : (
-                                  <Pin size={14} />
-                                )}
-                                {chat.pinned ? "Unpin" : "Pin"}
-                              </button>
-                              <button
-                                className="danger-action"
-                                type="button"
-                                role="menuitem"
-                                disabled={isSending}
-                                onClick={(event) => {
-                                  setChatActionError(null);
-                                  setDeleteChat(chat);
-                                  const details =
-                                    event.currentTarget.closest("details");
-                                  if (details) details.open = false;
-                                }}
-                              >
-                                <Trash2 size={14} />
-                                Delete
-                              </button>
-                            </div>
-                          </details>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={(event) => {
+                              void pinChat(chat);
+                              const details =
+                                event.currentTarget.closest("details");
+                              if (details) details.open = false;
+                            }}
+                          >
+                            {chat.pinned ? (
+                              <PinOff size={14} />
+                            ) : (
+                              <Pin size={14} />
+                            )}
+                            {chat.pinned ? "Unpin" : "Pin"}
+                          </button>
+                          <button
+                            className="danger-action"
+                            type="button"
+                            role="menuitem"
+                            disabled={isSending}
+                            onClick={(event) => {
+                              setChatActionError(null);
+                              setDeleteChat(chat);
+                              const details =
+                                event.currentTarget.closest("details");
+                              if (details) details.open = false;
+                            }}
+                          >
+                            <Trash2 size={14} />
+                            Delete
+                          </button>
                         </div>
-                      ))}
+                      </details>
                     </div>
-                  ),
-              )}
+                  ))}
+                </div>
+              ))}
               {chats.length === 0 && (
                 <p className="history-empty">No conversations yet</p>
               )}
@@ -1771,14 +1968,82 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="selected-file-list">
-                      {uploadFiles.map((file) => (
+                      {uploadFiles.map((item) => (
                         <div
-                          className="selected-file"
-                          key={`${file.name}-${file.size}-${file.lastModified}`}
+                          className={`selected-file is-${item.status}`}
+                          key={item.id}
                         >
                           <FileText size={15} />
-                          <span>{file.name}</span>
-                          <small>{formatFileSize(file.size)}</small>
+                          <div className="selected-file-copy">
+                            <span>{item.file.name}</span>
+                            <small>{formatFileSize(item.file.size)}</small>
+                          </div>
+                          <div
+                            className="selected-file-status"
+                            aria-live="polite"
+                          >
+                            {item.status === "queued" && (
+                              <LoaderCircle className="spin" size={13} />
+                            )}
+                            {item.status === "uploading" && (
+                              <Upload size={13} />
+                            )}
+                            {item.status === "indexing" && (
+                              <LoaderCircle className="spin" size={13} />
+                            )}
+                            {item.status === "indexed" && (
+                              <Check size={13} />
+                            )}
+                            {item.status === "duplicate" && (
+                              <CheckCheck size={13} />
+                            )}
+                            {item.status === "failed" && (
+                              <AlertCircle size={13} />
+                            )}
+                            <span>
+                              {item.status === "ready" && "Ready"}
+                              {item.status === "queued" && "Queued"}
+                              {item.status === "uploading" &&
+                                (item.progress
+                                  ? `Uploading ${item.progress}%`
+                                  : "Uploading…")}
+                              {item.status === "indexing" &&
+                                "Processing & indexing"}
+                              {item.status === "indexed" &&
+                                `Indexed · ${item.chunkCount ?? 0} chunk${
+                                  item.chunkCount === 1 ? "" : "s"
+                                }`}
+                              {item.status === "duplicate" &&
+                                "Already indexed"}
+                              {item.status === "failed" && "Failed"}
+                            </span>
+                            {item.status === "failed" &&
+                              uploadStep === "ready" && (
+                                <button
+                                  className="file-retry"
+                                  type="button"
+                                  onClick={() => void uploadDocuments([item])}
+                                >
+                                  <RotateCcw size={12} />
+                                  Retry
+                                </button>
+                              )}
+                          </div>
+                          {item.status === "uploading" && (
+                            <div
+                              className="file-progress"
+                              role="progressbar"
+                              aria-label={`Uploading ${item.file.name}`}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-valuenow={item.progress}
+                            >
+                              <span style={{ width: `${item.progress}%` }} />
+                            </div>
+                          )}
+                          {item.status === "failed" && item.error && (
+                            <p className="file-error">{item.error}</p>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1798,7 +2063,8 @@ export default function Home() {
                   type="button"
                   onClick={() => void uploadDocuments()}
                   disabled={
-                    uploadStep === "uploading" || uploadFiles.length === 0
+                    uploadStep === "uploading" ||
+                    readyUploadCount === 0
                   }
                 >
                   {uploadStep === "uploading" ? (
@@ -1808,7 +2074,11 @@ export default function Home() {
                   )}
                   {uploadStep === "uploading"
                     ? "Uploading and indexing…"
-                    : "Upload and index"}
+                    : readyUploadCount > 0
+                      ? `Upload ${readyUploadCount} document${
+                          readyUploadCount === 1 ? "" : "s"
+                        }`
+                      : "All documents processed"}
                 </button>
               </div>
             )}

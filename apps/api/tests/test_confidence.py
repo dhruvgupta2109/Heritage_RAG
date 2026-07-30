@@ -41,12 +41,37 @@ def test_decorative_provider_citation_is_normalized() -> None:
     assert cited == [1]
 
 
+def test_space_between_citation_and_punctuation_is_removed() -> None:
+    cleaned, cited = sanitize_answer(
+        "Supported content [S1] . Another claim [S1] , with context.",
+        valid_count=1,
+    )
+
+    assert cleaned == "Supported content [1]. Another claim [1], with context."
+    assert cited == [1]
+
+
 def test_hidden_reasoning_block_is_removed() -> None:
     cleaned, cited = sanitize_answer(
         "<think>Private reasoning.</think>\nFinal answer [S1].",
         valid_count=1,
     )
     assert cleaned == "Final answer [1]."
+    assert cited == [1]
+
+
+def test_markdown_table_formatting_is_preserved() -> None:
+    answer = (
+        "| Component | Purpose |\n"
+        "|---|---|\n"
+        "| Experience | Learning by doing [S1] |\n"
+        "| Reflection | Examining the learning [S1] |"
+    )
+
+    cleaned, cited = sanitize_answer(answer, valid_count=1)
+
+    assert "| Experience | Learning by doing [1] |" in cleaned
+    assert "| Reflection | Examining the learning [1] |" in cleaned
     assert cited == [1]
 
 

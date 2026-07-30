@@ -1,6 +1,7 @@
 import json
 
 from app.providers.base import (
+    GROUNDING_INSTRUCTIONS,
     _model_ids,
     clean_title,
     gemini_output_text,
@@ -8,6 +9,15 @@ from app.providers.base import (
     parse_query_lines,
     provider_error,
 )
+
+
+def test_grounding_prompt_requires_adaptive_markdown_formatting() -> None:
+    assert "GitHub-flavored Markdown" in GROUNDING_INSTRUCTIONS
+    assert "bullets for an unordered set" in GROUNDING_INSTRUCTIONS
+    assert "numbered list for ordered steps" in GROUNDING_INSTRUCTIONS
+    assert "table for comparisons" in GROUNDING_INSTRUCTIONS
+    assert "Do not force a table" in GROUNDING_INSTRUCTIONS
+    assert "factual table row" in GROUNDING_INSTRUCTIONS
 
 
 def test_openai_responses_text_is_extracted() -> None:

@@ -620,6 +620,38 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const menuSelector = ".tool-selector[open], .history-actions[open]";
+
+    function handleOutsidePointer(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      document
+        .querySelectorAll<HTMLDetailsElement>(menuSelector)
+        .forEach((menu) => {
+          if (!menu.contains(target)) menu.open = false;
+        });
+    }
+
+    function handleMenuEscape(event: globalThis.KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const openMenus =
+        document.querySelectorAll<HTMLDetailsElement>(menuSelector);
+      const returnFocus = openMenus[0]?.querySelector<HTMLElement>("summary");
+      openMenus.forEach((menu) => {
+        menu.open = false;
+      });
+      returnFocus?.focus();
+    }
+
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    document.addEventListener("keydown", handleMenuEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointer);
+      document.removeEventListener("keydown", handleMenuEscape);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!renameChat && !deleteChat && !uploadOpen) return;
     function handleEscape(event: globalThis.KeyboardEvent) {
       if (event.key !== "Escape" || chatActionBusy || uploadStep === "uploading") {

@@ -87,6 +87,8 @@ If `backdrop-filter` is unavailable or reduced transparency is enabled, use the 
 - Product mark/name at the top, followed by **New chat**.
 - Search/filter and chronological conversation groups.
 - Rename, pin/unpin, and delete appear in an overflow menu; deletion requires confirmation.
+- Model, retrieval, and chat-history overflow menus close when another menu is
+  chosen, the user clicks or taps outside, or Escape is pressed.
 - **Add documents** remains visually separate near the bottom and uses a lock/upload icon.
 - Collapse state and selected conversation are visually clear.
 

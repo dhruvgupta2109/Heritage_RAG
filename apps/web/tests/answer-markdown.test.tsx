@@ -138,3 +138,18 @@ test("model and retrieval selector menus use an opaque surface", () => {
     /\.selector-menu\s*\{[^}]*background:\s*#fbfbff;[^}]*backdrop-filter:\s*none;/s,
   );
 });
+
+test("all dropdown families share outside-click and Escape closing", () => {
+  const page = readFileSync(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    page,
+    /\.tool-selector\[open], \.history-actions\[open]/,
+  );
+  assert.match(page, /addEventListener\("pointerdown", handleOutsidePointer\)/);
+  assert.match(page, /if \(!menu\.contains\(target\)\) menu\.open = false/);
+  assert.match(page, /addEventListener\("keydown", handleMenuEscape\)/);
+});

@@ -9,6 +9,7 @@
     "dev:api": "uv run --project apps/api uvicorn app.main:app --app-dir apps/api --reload --host 127.0.0.1 --port 8000",
     "dev:web": "npm run dev --workspace @heritage/web",
     "build": "npm run build --workspace @heritage/web",
+    "test:web": "npm run test --workspace @heritage/web",
     "test:api": "uv run --project apps/api pytest apps/api/tests",
     "index": "uv --directory apps/api run python -m app.cli index",
     "eval": "uv --directory apps/api run python -m app.cli evaluate"

@@ -60,6 +60,7 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000). The API runs on `http://127
 
 ```bash
 npm run test:api
+npm run test:web
 npm run build
 npm run eval -- --mode medium
 ```

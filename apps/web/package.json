@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1"
+    "start": "next start --hostname 127.0.0.1",
+    "test": "tsx --test tests/**/*.test.tsx"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -21,6 +22,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.0"
   }
 }

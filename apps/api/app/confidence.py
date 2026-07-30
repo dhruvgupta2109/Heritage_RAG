@@ -10,6 +10,7 @@ from .schemas import (
 SENTENCE_PATTERN = re.compile(r"(?<=[.!?])\s+|\n+")
 SOURCE_MARKER = re.compile(r"(?:\[|【)\s*S(\d+)\s*(?:\]|】)", re.IGNORECASE)
 THINK_BLOCK = re.compile(r"<think>.*?</think>\s*", re.IGNORECASE | re.DOTALL)
+CITATION_PUNCTUATION_GAP = re.compile(r"(\[\d+])\s+([,.;:!?])")
 
 LABELS: dict[ConfidenceLevel, str] = {
     "very_high": "Very high confidence",
@@ -36,7 +37,8 @@ def sanitize_answer(answer: str, valid_count: int) -> tuple[str, list[int]]:
         source_id = int(match.group(1))
         return f"[{source_id}]" if source_id in valid else ""
 
-    cleaned = SOURCE_MARKER.sub(replace_marker, answer).strip()
+    cleaned = SOURCE_MARKER.sub(replace_marker, answer)
+    cleaned = CITATION_PUNCTUATION_GAP.sub(r"\1\2", cleaned).strip()
     return cleaned, cited
 
 

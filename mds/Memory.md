@@ -35,6 +35,9 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Target runtime: loopback-only localhost.
 - Default retrieval mode: Medium.
 - Answer confidence measures document support, not model certainty.
+- Every provider uses one shared adaptive-formatting contract: concise prose,
+  bullets, numbered steps, comparison tables, or short sections according to
+  whichever structure makes the specific answer easiest to understand.
 - No source evidence means Very low confidence and an explicit no-support response.
 - Page numbers must come from reliable extraction metadata. If unavailable, show **Page unavailable** and a section/paragraph/line locator; never fabricate a page.
 - Answer text, citations, **Answered from**, and confidence snapshots are stored together so history is reproducible.
@@ -76,7 +79,8 @@ Heritage RAG is a single-user, localhost document assistant with:
 - Added password-gated multi-document upload, secure session/rate limiting,
   content and size validation, safe naming, duplicate detection, and immediate indexing.
 - Hid the Next.js development indicator from the app preview.
-- Added 31 passing backend tests and a successful production frontend build.
+- Added 34 passing backend tests, three focused web Markdown-rendering tests,
+  and a successful production frontend build.
 - Verified the known answer: Experience, Reflection, Dialogue, and Understanding from `Experiential Learning at HXLS Noida | Learning by Doing.pdf`, Page 1, with High confidence.
 - Verified an unrelated query returns no source and Very low confidence.
 
@@ -132,3 +136,9 @@ Review the connected upload and history controls locally, then:
 - Implemented the Phase 2 provider adapters, availability-aware model menu,
   Deep query expansion, local full re-ranking, and corpus evaluation set.
 - Added protected multi-document upload and persistent rename/pin/delete chat actions.
+- Added shared adaptive Markdown answer formatting across all providers, with
+  citations required on factual prose, list items, and table rows.
+- Added complete answer typography and spacing for headings, paragraphs, nested
+  lists, tables, quotations, links, code, separators, task lists, and images.
+  Wide tables now scroll within an accessible bordered region, and citation
+  punctuation spacing is repaired for both new and historical answers.

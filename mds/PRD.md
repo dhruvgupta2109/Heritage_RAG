@@ -46,6 +46,11 @@ A locally-hosted chat application that lets you ask questions over a folder of y
 ### 5.1 Chat Interface
 - Central chat window, ChatGPT-style bubbles, streaming token-by-token responses.
 - Input bar pinned at the bottom with the two selectors built into it (like ChatGPT's tools row).
+- Answers use the clearest question-appropriate Markdown structure: concise
+  prose for simple answers, bullets for sets, numbered lists for ordered steps,
+  compact tables for comparisons or shared attributes, and short headings only
+  for genuinely distinct sections. Formatting must improve comprehension rather
+  than decorate the response.
 - Each answer supported by retrieved evidence shows citation markers in the answer text and an expandable **Sources** section.
 - Every source entry shows the document name, page number or page range, and the supporting snippet. Selecting a citation opens or previews the referenced page when possible.
 - The answer footer always summarizes **Answered from** with the document name(s) and page number(s), even when the Sources section is collapsed. A no-evidence response shows **Answered from: No supporting document found**.

@@ -33,6 +33,8 @@ Principles:
 - The conversation uses the full width with 16 px outer padding.
 - The source preview becomes a full-screen sheet.
 - Model and speed controls may wrap, but the send control stays obvious.
+- Model and retrieval dropdown panels use fully opaque surfaces so answer text
+  and background gradients never show through their options.
 
 ## 3. Visual Tokens
 
